@@ -32,12 +32,12 @@ resource "aws_security_group" "rds" {
 resource "aws_db_instance" "main" {
   identifier = "${var.app_name}-db"
 
-  engine               = "postgres"
-  engine_version       = "16.1"
-  instance_class       = var.environment == "prod" ? "db.r6g.large" : "db.t3.micro"
-  allocated_storage    = 20
+  engine                = "postgres"
+  engine_version        = "16.1"
+  instance_class        = var.environment == "prod" ? "db.r6g.large" : "db.t3.micro"
+  allocated_storage     = 20
   max_allocated_storage = 100
-  storage_type         = "gp3"
+  storage_type          = "gp3"
 
   db_name  = "documind"
   username = "documind"
@@ -48,8 +48,8 @@ resource "aws_db_instance" "main" {
   vpc_security_group_ids = [aws_security_group.rds.id]
 
   backup_retention_period = 7
-  backup_window          = "03:00-04:00"
-  maintenance_window     = "Mon:04:00-Mon:05:00"
+  backup_window           = "03:00-04:00"
+  maintenance_window      = "Mon:04:00-Mon:05:00"
 
   enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
   performance_insights_enabled    = true

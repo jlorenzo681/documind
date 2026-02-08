@@ -10,11 +10,11 @@ resource "google_redis_instance" "main" {
   authorized_network = google_compute_network.main.id
 
   # High availability settings (for STANDARD_HA tier)
-  replica_count            = var.environment == "prod" ? 1 : 0
-  read_replicas_mode       = var.environment == "prod" ? "READ_REPLICAS_ENABLED" : "READ_REPLICAS_DISABLED"
-  
+  replica_count      = var.environment == "prod" ? 1 : 0
+  read_replicas_mode = var.environment == "prod" ? "READ_REPLICAS_ENABLED" : "READ_REPLICAS_DISABLED"
+
   # Security
-  auth_enabled       = true
+  auth_enabled            = true
   transit_encryption_mode = "SERVER_AUTHENTICATION"
 
   # Maintenance

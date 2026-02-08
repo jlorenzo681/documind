@@ -29,10 +29,10 @@ resource "aws_elasticache_replication_group" "main" {
   replication_group_id = "${var.app_name}-redis"
   description          = "DocuMind Redis cache"
 
-  engine               = "redis"
-  engine_version       = "7.1"
-  node_type            = var.environment == "prod" ? "cache.r6g.large" : "cache.t3.micro"
-  num_cache_clusters   = var.environment == "prod" ? 2 : 1
+  engine             = "redis"
+  engine_version     = "7.1"
+  node_type          = var.environment == "prod" ? "cache.r6g.large" : "cache.t3.micro"
+  num_cache_clusters = var.environment == "prod" ? 2 : 1
 
   port                 = 6379
   parameter_group_name = "default.redis7"

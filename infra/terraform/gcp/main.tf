@@ -62,6 +62,24 @@ variable "domain_name" {
   default     = "api.documind.example.com"
 }
 
+variable "qdrant_url" {
+  description = "Qdrant URL"
+  type        = string
+  default     = "https://xyz-example.us-east4-0.gcp.cloud.qdrant.io:6333"
+}
+
+variable "langsmith_project" {
+  description = "LangSmith Project Name"
+  type        = string
+  default     = "documind"
+}
+
+variable "langsmith_tracing_v2" {
+  description = "Enable LangSmith Tracing V2"
+  type        = string
+  default     = "true"
+}
+
 # Enable required APIs
 resource "google_project_service" "required_apis" {
   for_each = toset([
@@ -175,7 +193,7 @@ resource "google_cloud_run_v2_service" "main" {
 
       env {
         name  = "ENVIRONMENT"
-        value = var.environment
+        value = var.environment == "prod" ? "production" : var.environment
       }
 
       env {
@@ -187,7 +205,27 @@ resource "google_cloud_run_v2_service" "main" {
         name = "OPENAI_API_KEY"
         value_source {
           secret_key_ref {
-            secret  = google_secret_manager_secret.api_keys.secret_id
+            secret  = google_secret_manager_secret.openai_api_key.secret_id
+            version = "latest"
+          }
+        }
+      }
+
+      env {
+        name = "ANTHROPIC_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.anthropic_api_key.secret_id
+            version = "latest"
+          }
+        }
+      }
+
+      env {
+        name = "GROQ_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.groq_api_key.secret_id
             version = "latest"
           }
         }
@@ -206,6 +244,61 @@ resource "google_cloud_run_v2_service" "main" {
       env {
         name  = "REDIS_URL"
         value = "redis://${google_redis_instance.main.host}:${google_redis_instance.main.port}"
+      }
+
+      env {
+        name  = "QDRANT_URL"
+        value = var.qdrant_url
+      }
+
+      env {
+        name  = "LANGSMITH_PROJECT"
+        value = var.langsmith_project
+      }
+
+      env {
+        name  = "LANGSMITH_TRACING_V2"
+        value = var.langsmith_tracing_v2
+      }
+
+      env {
+        name  = "GCS_BUCKET_NAME"
+        value = google_storage_bucket.documents.name
+      }
+
+      env {
+        name  = "GCP_PROJECT_ID"
+        value = var.project_id
+      }
+
+      env {
+        name = "QDRANT_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.qdrant_api_key.secret_id
+            version = "latest"
+          }
+        }
+      }
+
+      env {
+        name = "LANGSMITH_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.langsmith_api_key.secret_id
+            version = "latest"
+          }
+        }
+      }
+
+      env {
+        name = "SECRET_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.app_secret_key.secret_id
+            version = "latest"
+          }
+        }
       }
 
       startup_probe {
