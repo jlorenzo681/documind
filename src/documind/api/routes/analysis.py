@@ -86,7 +86,7 @@ async def start_analysis(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Document {request.document_id} not found",
-        )
+        ) from None
 
     # Create task
     task_id = str(uuid.uuid4())

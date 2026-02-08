@@ -246,7 +246,7 @@ class LLMService:
         prompt: str,
         system_prompt: str | None,
         model: str,
-        temperature: float,
+        temperature: float,  # noqa: ARG002
         max_tokens: int,
     ) -> str:
         """Generate using Anthropic."""
@@ -348,6 +348,7 @@ class Reranker:
     ) -> list[dict[str, Any]]:
         """Rerank using cross-encoder model."""
         import asyncio
+
         from sentence_transformers import CrossEncoder
 
         model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
@@ -361,7 +362,7 @@ class Reranker:
         scores = await asyncio.to_thread(_score)
 
         # Sort by score
-        scored_docs = list(zip(documents, scores))
+        scored_docs = list(zip(documents, scores, strict=False))
         scored_docs.sort(key=lambda x: x[1], reverse=True)
 
         reranked = []

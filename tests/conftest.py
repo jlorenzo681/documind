@@ -1,7 +1,7 @@
 """Pytest configuration for DocuMind tests."""
 
+
 import pytest
-from typing import Generator
 
 
 @pytest.fixture

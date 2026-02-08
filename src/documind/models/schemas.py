@@ -1,13 +1,13 @@
 """Pydantic schemas for API requests and responses."""
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 
-class AnalysisTask(str, Enum):
+class AnalysisTask(StrEnum):
     """Available analysis tasks."""
 
     SUMMARIZE = "summarize"
@@ -16,7 +16,7 @@ class AnalysisTask(str, Enum):
     FULL = "full"
 
 
-class AnalysisStatus(str, Enum):
+class AnalysisStatus(StrEnum):
     """Status of an analysis job."""
 
     QUEUED = "queued"

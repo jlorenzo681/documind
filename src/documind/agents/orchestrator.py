@@ -51,11 +51,10 @@ async def report_node(state: AgentState) -> AgentState:
 def should_continue(state: AgentState) -> Literal["summarize", "end"]:
     """Determine if processing should continue after parsing."""
     # Check for critical errors
-    if state.get("errors") and len(state["errors"]) > 0:
-        # Check if parsing failed completely
-        if not state.get("chunks"):
-            logger.error("Parsing failed, no chunks extracted")
-            return "end"
+    # Check for critical errors
+    if state.get("errors") and len(state["errors"]) > 0 and not state.get("chunks"):
+        logger.error("Parsing failed, no chunks extracted")
+        return "end"
 
     return "summarize"
 
@@ -68,7 +67,7 @@ def after_summary(state: AgentState) -> Literal["qa", "compliance"]:
     return "compliance"
 
 
-def after_qa(state: AgentState) -> Literal["compliance"]:
+def after_qa(state: AgentState) -> Literal["compliance"]:  # noqa: ARG001
     """Always proceed to compliance after QA."""
     return "compliance"
 

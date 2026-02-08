@@ -10,7 +10,7 @@ logger = LoggerAdapter("utils.chunking")
 class ChunkingStrategy:
     """Base class for chunking strategies."""
 
-    def chunk(self, text: str, **kwargs: Any) -> list[dict[str, Any]]:
+    def chunk(self, text: str, **kwargs: Any) -> list[dict[str, Any]]:  # noqa: ARG002
         """Split text into chunks.
 
         Args:
@@ -49,7 +49,7 @@ class RecursiveCharacterChunker(ChunkingStrategy):
             "",  # Characters
         ]
 
-    def chunk(self, text: str, **kwargs: Any) -> list[dict[str, Any]]:
+    def chunk(self, text: str, **kwargs: Any) -> list[dict[str, Any]]:  # noqa: ARG002
         """Split text using recursive character strategy."""
         return self._split_text(text, self.separators)
 
@@ -63,10 +63,7 @@ class RecursiveCharacterChunker(ChunkingStrategy):
         separator = separators[0] if separators else ""
         remaining_separators = separators[1:] if len(separators) > 1 else []
 
-        if separator:
-            splits = text.split(separator)
-        else:
-            splits = list(text)
+        splits = text.split(separator) if separator else list(text)
 
         current_chunk = ""
         current_start = 0
@@ -135,7 +132,7 @@ class SemanticChunker(ChunkingStrategy):
         self.chunk_size = chunk_size
         self.similarity_threshold = similarity_threshold
 
-    def chunk(self, text: str, **kwargs: Any) -> list[dict[str, Any]]:
+    def chunk(self, text: str, **kwargs: Any) -> list[dict[str, Any]]:  # noqa: ARG002
         """Split text based on semantic similarity."""
         # Split into sentences
         sentences = self._split_sentences(text)
@@ -201,7 +198,7 @@ class DocumentStructureChunker(ChunkingStrategy):
         self.chunk_size = chunk_size
         self.respect_headers = respect_headers
 
-    def chunk(self, text: str, **kwargs: Any) -> list[dict[str, Any]]:
+    def chunk(self, text: str, **kwargs: Any) -> list[dict[str, Any]]:  # noqa: ARG002
         """Split text respecting document structure."""
         import re
 

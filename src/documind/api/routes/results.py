@@ -1,5 +1,7 @@
 """Results retrieval endpoints."""
 
+from pathlib import Path
+
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import FileResponse
 
@@ -8,11 +10,10 @@ from documind.models.schemas import (
     AnalysisStatus,
     ComplianceResult,
     FullAnalysisResult,
-    SummaryResult,
     QAResult,
+    SummaryResult,
 )
 from documind.monitoring import LoggerAdapter
-from pathlib import Path
 
 router = APIRouter()
 logger = LoggerAdapter("api.results")

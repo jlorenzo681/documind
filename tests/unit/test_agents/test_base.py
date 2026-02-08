@@ -1,6 +1,5 @@
 """Unit tests for agent base classes."""
 
-import pytest
 from documind.agents.base import AgentResult
 
 

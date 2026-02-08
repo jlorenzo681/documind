@@ -1,8 +1,7 @@
 """Agent state definitions for LangGraph orchestration."""
 
-from typing import Annotated, Any, TypedDict
-
 import operator
+from typing import Annotated, Any, TypedDict
 
 
 class DocumentChunk(TypedDict):

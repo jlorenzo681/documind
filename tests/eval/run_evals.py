@@ -1,7 +1,6 @@
 """LLM Evaluation runner using ragas framework."""
 
 import json
-import os
 from pathlib import Path
 
 
@@ -15,14 +14,14 @@ def run_evaluations():
     - Context Recall: Is all necessary information retrieved?
     """
     try:
+        from datasets import Dataset
         from ragas import evaluate
         from ragas.metrics import (
-            faithfulness,
             answer_relevancy,
             context_precision,
             context_recall,
+            faithfulness,
         )
-        from datasets import Dataset
     except ImportError:
         print("ragas not installed. Generating mock results.")
         results = {

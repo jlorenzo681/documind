@@ -53,8 +53,8 @@ class SummarizationAgent(BaseAgent):
 
     async def _direct_summarize(self, state: AgentState) -> dict[str, Any]:
         """Directly summarize all content at once."""
-        from langchain_openai import ChatOpenAI
         from langchain_core.prompts import ChatPromptTemplate
+        from langchain_openai import ChatOpenAI
 
         from documind.config import get_settings
 
@@ -74,8 +74,8 @@ class SummarizationAgent(BaseAgent):
             [
                 (
                     "system",
-                    """You are an expert document analyst. Provide a concise 
-            executive summary of the document in 2-3 paragraphs. Focus on the 
+                    """You are an expert document analyst. Provide a concise
+            executive summary of the document in 2-3 paragraphs. Focus on the
             most important information that a busy executive would need to know.""",
                 ),
                 ("user", "{document}"),
@@ -90,13 +90,13 @@ class SummarizationAgent(BaseAgent):
             [
                 (
                     "system",
-                    """You are an expert document analyst. Analyze the document 
+                    """You are an expert document analyst. Analyze the document
             and provide:
             1. A detailed summary organized by topic/section
             2. A list of key points (bullet points)
             3. The detected document type (e.g., contract, report, policy, etc.)
-            
-            Format your response as JSON with keys: 
+
+            Format your response as JSON with keys:
             'detailed_summary', 'key_points' (list), 'document_type'""",
                 ),
                 ("user", "{document}"),
@@ -127,8 +127,8 @@ class SummarizationAgent(BaseAgent):
 
     async def _map_reduce_summarize(self, state: AgentState) -> dict[str, Any]:
         """Use map-reduce for long documents."""
-        from langchain_openai import ChatOpenAI
         from langchain_core.prompts import ChatPromptTemplate
+        from langchain_openai import ChatOpenAI
 
         from documind.config import get_settings
 
@@ -145,7 +145,7 @@ class SummarizationAgent(BaseAgent):
             [
                 (
                     "system",
-                    """Summarize the following section of a document. 
+                    """Summarize the following section of a document.
             Extract the main points and key information.""",
                 ),
                 ("user", "{chunk}"),

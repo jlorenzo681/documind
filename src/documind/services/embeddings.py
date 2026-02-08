@@ -116,6 +116,7 @@ class EmbeddingService:
     async def _embed_local(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings using local sentence-transformers."""
         import asyncio
+
         from sentence_transformers import SentenceTransformer
 
         model = SentenceTransformer("all-MiniLM-L6-v2")

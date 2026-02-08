@@ -1,7 +1,7 @@
 """DocuMind FastAPI Application."""
 
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,12 +14,12 @@ from documind.monitoring import setup_logging
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:  # noqa: ARG001
     """Application lifespan handler for startup/shutdown."""
     # Startup
     setup_logging()
 
-    settings = get_settings()
+    get_settings()
 
     # Initialize services if needed
     # e.g., connect to databases, warm up caches

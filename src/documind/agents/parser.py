@@ -46,15 +46,12 @@ class DocumentParserAgent(BaseAgent):
             elif suffix == ".docx":
                 raw_text = await self._parse_docx(doc_path)
                 doc_type = "docx"
-                page_count = None
             elif suffix in {".txt", ".md"}:
                 raw_text = await self._parse_text(doc_path)
                 doc_type = "text"
-                page_count = None
             elif suffix in {".png", ".jpg", ".jpeg", ".tiff"}:
                 raw_text = await self._parse_image(doc_path)
                 doc_type = "image"
-                page_count = None
             else:
                 state = self._add_error(state, f"Unsupported file type: {suffix}")
                 return state

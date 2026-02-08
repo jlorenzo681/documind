@@ -54,6 +54,7 @@ class ReportGeneratorAgent(BaseAgent):
 
     async def _generate_pdf_report(self, state: AgentState) -> Path:
         """Generate a PDF report from analysis results."""
+        from reportlab.lib import colors
         from reportlab.lib.pagesizes import letter
         from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
         from reportlab.lib.units import inch
@@ -64,7 +65,6 @@ class ReportGeneratorAgent(BaseAgent):
             Table,
             TableStyle,
         )
-        from reportlab.lib import colors
 
         # Create output path
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")

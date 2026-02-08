@@ -1,9 +1,10 @@
 """Integration tests for DocuMind API."""
 
+import io
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, AsyncMock, MagicMock
-import io
 
 from documind.main import app
 

@@ -101,7 +101,7 @@ class VectorStoreService:
         points: list[PointStruct] = []
         chunk_ids: list[str] = []
 
-        for i, (doc, embedding) in enumerate(zip(documents, embeddings)):
+        for i, (doc, embedding) in enumerate(zip(documents, embeddings, strict=False)):
             chunk_id = str(uuid4())
             chunk_ids.append(chunk_id)
 
@@ -153,7 +153,7 @@ class VectorStoreService:
         Returns:
             List of matching documents with scores
         """
-        from qdrant_client.models import Filter, FieldCondition, MatchValue
+        from qdrant_client.models import FieldCondition, Filter, MatchValue
 
         client = self._get_client()
 
@@ -279,7 +279,7 @@ class VectorStoreService:
         Returns:
             Number of chunks deleted
         """
-        from qdrant_client.models import Filter, FieldCondition, MatchValue
+        from qdrant_client.models import FieldCondition, Filter, MatchValue
 
         client = self._get_client()
 

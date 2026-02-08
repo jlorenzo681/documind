@@ -1,8 +1,9 @@
 """Prometheus metrics for DocuMind."""
 
 import time
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, Callable, ParamSpec, TypeVar
+from typing import Any, ParamSpec, TypeVar
 
 from prometheus_client import Counter, Gauge, Histogram
 
@@ -39,7 +40,7 @@ class MetricsCollector:
         self.token_usage = Counter(
             "documind_tokens_total",
             "Total tokens used",
-            ["model", "type"],  # type: input/output
+            ["model", "type"],  # metric type: input/output
         )
 
         self.llm_calls = Counter(

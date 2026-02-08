@@ -64,8 +64,8 @@ class QAAgent(BaseAgent):
 
     async def _answer_question(self, question: str, state: AgentState) -> dict[str, Any]:
         """Answer a single question using RAG."""
-        from langchain_openai import ChatOpenAI, OpenAIEmbeddings
         from langchain_core.prompts import ChatPromptTemplate
+        from langchain_openai import ChatOpenAI
 
         from documind.config import get_settings
 
@@ -90,11 +90,11 @@ class QAAgent(BaseAgent):
             [
                 (
                     "system",
-                    """You are a helpful document analyst. Answer the question 
-            based ONLY on the provided context. If the answer cannot be found in 
+                    """You are a helpful document analyst. Answer the question
+            based ONLY on the provided context. If the answer cannot be found in
             the context, say so clearly.
-            
-            Provide your answer in a clear, direct manner. Cite your sources using 
+
+            Provide your answer in a clear, direct manner. Cite your sources using
             [Source N] notation.""",
                 ),
                 (

@@ -101,8 +101,8 @@ class ComplianceAgent(BaseAgent):
 
     async def _check_compliance(self, text: str, state: AgentState) -> list[dict[str, Any]]:
         """Check document for compliance issues using LLM."""
-        from langchain_openai import ChatOpenAI
         from langchain_core.prompts import ChatPromptTemplate
+        from langchain_openai import ChatOpenAI
 
         from documind.config import get_settings
 
@@ -118,22 +118,22 @@ class ComplianceAgent(BaseAgent):
             [
                 (
                     "system",
-                    """You are an expert legal and compliance analyst. 
+                    """You are an expert legal and compliance analyst.
             Analyze the document for potential risks and compliance issues.
-            
+
             Focus on:
             1. GDPR and data protection concerns
             2. Contract risk clauses (unlimited liability, auto-renewal, etc.)
             3. Missing standard clauses
             4. Ambiguous or problematic language
-            
+
             For each issue found, provide:
             - category: The type of issue (gdpr, contract_risk, missing_clause, ambiguity)
             - severity: high, medium, or low
             - description: Brief description of the issue
             - location: Where in the document (if identifiable)
             - excerpt: Relevant text excerpt (max 100 chars)
-            
+
             Return as JSON array of issues. If no issues, return empty array [].""",
                 ),
                 ("user", "{document}"),
