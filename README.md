@@ -1,6 +1,6 @@
 # 🧠 DocuMind
 
-[![CI](https://github.com/yourusername/documind/workflows/CI/badge.svg)](https://github.com/yourusername/documind/actions)
+[![CI](https://github.com/jlorenzo681/documind/workflows/CI/badge.svg)](https://github.com/jlorenzo681/documind/actions)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
@@ -24,14 +24,14 @@ DocuMind is an intelligent document processing platform that uses 6 specialized 
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     FastAPI Gateway                          │
+│                     FastAPI Gateway                         │
 ├─────────────────────────────────────────────────────────────┤
-│                   LangGraph Orchestrator                     │
-├──────────┬──────────┬──────────┬──────────┬────────────────┤
-│  Parser  │Summarizer│    QA    │Compliance│    Reporter    │
-│  Agent   │  Agent   │  Agent   │  Agent   │     Agent      │
-├──────────┴──────────┴──────────┴──────────┴────────────────┤
-│   Qdrant   │   Redis   │  PostgreSQL  │       S3          │
+│                   LangGraph Orchestrator                    │
+├──────────┬──────────┬──────────┬──────────┬─────────────────┤
+│  Parser  │Summarizer│    QA    │Compliance│    Reporter     │
+│  Agent   │  Agent   │  Agent   │  Agent   │     Agent       │
+├──────────┴──────────┴──────────┴──────────┴─────────────────┤
+│   Qdrant   │   Redis   │  PostgreSQL  │       S3            │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -40,7 +40,7 @@ DocuMind is an intelligent document processing platform that uses 6 specialized 
 ### Prerequisites
 
 - Python 3.11+
-- Docker & Docker Compose
+- Docker & Docker Compose OR Podman & podman-compose
 
 ### Installation
 
@@ -67,6 +67,8 @@ cp .env.example .env
 ```bash
 # Start Qdrant, Redis, PostgreSQL, Prometheus, Grafana
 make docker-up
+# OR with Podman
+make podman-up
 ```
 
 ### Run the API
@@ -162,6 +164,15 @@ make docker-build
 docker compose -f infra/docker/docker-compose.yml --profile api up
 ```
 
+### Podman
+
+```bash
+# Run with all infrastructure
+make run-podman
+```
+
+For detailed instructions, see [Deployment Guide](docs/deployment.md).
+
 ### AWS (ECS)
 
 The CD pipeline automatically deploys to AWS ECS on push to `main`. See `.github/workflows/cd.yml`.
@@ -186,14 +197,6 @@ See `.env.example` for all options.
 - [API Reference](http://localhost:8000/docs)
 - [Deployment Guide](docs/deployment.md)
 - [MLOps Pipeline](docs/mlops.md)
-
-## 🗺️ Roadmap
-
-- [ ] GraphRAG for document relationships
-- [ ] Multi-modal analysis (tables, charts)
-- [ ] Streaming responses (SSE)
-- [ ] Fine-tuned domain models
-- [ ] Multi-tenancy support
 
 ## 📄 License
 

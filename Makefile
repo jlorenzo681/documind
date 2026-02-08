@@ -73,6 +73,11 @@ run:
 run-docker:
 	docker compose -f infra/docker/docker-compose.yml --profile api up
 
+# Run with Podman
+run-podman:
+	podman-compose -f infra/docker/podman-compose.yml --profile api up -d
+	@echo "Services are starting. The API will be available at http://localhost:8000/health"
+
 # Clean build artifacts
 clean:
 	rm -rf build/
