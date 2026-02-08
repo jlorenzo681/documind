@@ -108,7 +108,7 @@ curl http://localhost:8000/results/TASK_ID
 | **Storage** | PostgreSQL, Redis, S3 |
 | **Monitoring** | Prometheus, Grafana, LangSmith |
 | **CI/CD** | GitHub Actions, Docker |
-| **Cloud** | AWS (ECS, Lambda), Azure, GCP |
+| **Cloud** | GCP (Cloud Run, Cloud SQL), Kubernetes |
 
 ## 🧪 Testing
 
@@ -154,26 +154,19 @@ documind/
 
 ## 🚀 Deployment
 
-### Docker
+### GCP (Cloud Run)
 
 ```bash
 # Build image
 make docker-build
 
 # Run with all infrastructure
-docker compose -f infra/docker/docker-compose.yml --profile api up
-```
-
-### Podman
-
-```bash
-# Run with all infrastructure
 make run-podman
 ```
 
 For detailed instructions, see [Deployment Guide](docs/deployment.md).
 
-### AWS (ECS)
+### Kubernetes
 
 The CD pipeline automatically deploys to AWS ECS on push to `main`. See `.github/workflows/cd.yml`.
 

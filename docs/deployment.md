@@ -67,21 +67,164 @@ To stop all services:
 make podman-down
 ```
 
-## Troubleshooting
+---
 
-- **Port Conflicts**: Ensure ports 8000, 6333, 6379, 5432, 9090, and 3000 are free.
+# Deploying DocuMind to GCP
 
-## Common Issues
+This guide describes how to deploy DocuMind to Google Cloud Platform using Cloud Run and Terraform.
 
-### Image Names
-Podman may require fully qualified image names (e.g., `docker.io/library/postgres:16-alpine`) if search registries are not configured.
+## Prerequisites
 
-### Healthchecks
-If `curl` is missing in a container (like `qdrant`), use a TCP check:
-```yaml
-test: ["CMD-SHELL", "bash -c 'cat < /dev/tcp/localhost/6333'"]
+- **GCP Account**: Active Google Cloud Platform account
+- **GCP Project**: Create a new project or use existing one
+- **Terraform**: Version 1.5.0 or higher
+- **gcloud CLI**: Google Cloud SDK installed and configured
+
+## Setup
+
+### 1. Enable Required APIs
+
+```bash
+gcloud services enable \
+  run.googleapis.com \
+  artifactregistry.googleapis.com \
+  sqladmin.googleapis.com \
+  redis.googleapis.com \
+  secretmanager.googleapis.com \
+  compute.googleapis.com \
+  servicenetworking.googleapis.com \
+  vpcaccess.googleapis.com
 ```
 
-### Build Errors
-- **Missing README.md**: Ensure `README.md` is in the build context if `pyproject.toml` references it.
-- **Package Names**: Debian package names may differ in base images (e.g., `libgdk-pixbuf-2.0-0` vs `libgdk-pixbuf2.0-0`).
+### 2. Create Terraform State Bucket
+
+```bash
+gsutil mb -l us-central1 gs://documind-terraform-state
+gsutil versioning set on gs://documind-terraform-state
+```
+
+### 3. Configure Workload Identity for GitHub Actions
+
+```bash
+# Create service account
+gcloud iam service-accounts create github-actions \
+  --display-name="GitHub Actions"
+
+# Grant necessary roles
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
+  --member="serviceAccount:github-actions@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
+  --role="roles/run.admin"
+
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
+  --member="serviceAccount:github-actions@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
+  --role="roles/artifactregistry.writer"
+
+# Create Workload Identity Pool
+gcloud iam workload-identity-pools create "github-pool" \
+  --location="global" \
+  --display-name="GitHub Actions Pool"
+
+# Create Workload Identity Provider
+gcloud iam workload-identity-pools providers create-oidc "github-provider" \
+  --location="global" \
+  --workload-identity-pool="github-pool" \
+  --display-name="GitHub Provider" \
+  --attribute-mapping="google.subject=assertion.sub,attribute.actor=assertion.actor,attribute.repository=assertion.repository" \
+  --issuer-uri="https://token.actions.githubusercontent.com"
+
+# Bind service account to Workload Identity
+gcloud iam service-accounts add-iam-policy-binding \
+  github-actions@YOUR_PROJECT_ID.iam.gserviceaccount.com \
+  --role="roles/iam.workloadIdentityUser" \
+  --member="principalSet://iam.googleapis.com/projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github-pool/attribute.repository/YOUR_GITHUB_USERNAME/documind"
+```
+
+### 4. Set GitHub Secrets
+
+Add the following secrets to your GitHub repository:
+
+- `GCP_PROJECT_ID`: Your GCP project ID
+- `GCP_WORKLOAD_IDENTITY_PROVIDER`: `projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github-pool/providers/github-provider`
+- `GCP_SERVICE_ACCOUNT`: `github-actions@YOUR_PROJECT_ID.iam.gserviceaccount.com`
+
+## Deployment
+
+### 1. Initialize Terraform
+
+```bash
+cd infra/terraform/gcp
+terraform init
+```
+
+### 2. Configure Variables
+
+Create `terraform.tfvars`:
+
+```hcl
+project_id  = "your-project-id"
+region      = "us-central1"
+environment = "prod"
+domain_name = "api.yourdomain.com"
+```
+
+### 3. Deploy Infrastructure
+
+```bash
+terraform plan
+terraform apply
+```
+
+### 4. Update Secrets
+
+```bash
+# Update API keys
+echo -n '{"openai_api_key":"YOUR_KEY","anthropic_api_key":"YOUR_KEY"}' | \
+  gcloud secrets versions add documind-api-keys --data-file=-
+```
+
+### 5. Deploy Application
+
+Push to `main` branch to trigger CD pipeline:
+
+```bash
+git push origin main
+```
+
+## Verification
+
+Check Cloud Run service:
+
+```bash
+gcloud run services describe documind-api --region us-central1
+```
+
+Test the API:
+
+```bash
+SERVICE_URL=$(gcloud run services describe documind-api \
+  --region us-central1 \
+  --format 'value(status.url)')
+curl ${SERVICE_URL}/health
+```
+
+## Monitoring
+
+- **Cloud Run Logs**: `gcloud run services logs read documind-api --region us-central1`
+- **Cloud SQL**: Check Cloud Console for database metrics
+- **Memorystore**: Monitor Redis instance in Cloud Console
+
+## Troubleshooting
+
+### Common Issues
+
+#### Image Names
+Ensure Artifact Registry repository exists and image names are fully qualified.
+
+#### VPC Connectivity
+Verify VPC Access Connector is created and Cloud Run service is configured to use it.
+
+#### Secrets Access
+Ensure service account has `secretmanager.secretAccessor` role.
+
+#### Database Connection
+Verify Cloud SQL instance has private IP and VPC peering is configured correctly.
