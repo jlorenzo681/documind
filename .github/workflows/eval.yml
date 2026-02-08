@@ -1,0 +1,71 @@
+name: LLM Evaluation
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  evaluate:
+    name: Run LLM Evaluations
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev]"
+
+      - name: Run ragas evaluations
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+        run: |
+          python tests/eval/run_evals.py
+
+      - name: Check thresholds
+        run: |
+          python -c "
+          import json
+          with open('eval_results.json') as f:
+              results = json.load(f)
+
+          thresholds = {
+              'faithfulness': 0.85,
+              'answer_relevancy': 0.80,
+              'context_precision': 0.75,
+              'context_recall': 0.75,
+          }
+
+          failed = []
+          for metric, threshold in thresholds.items():
+              score = results.get(metric, 0)
+              if score < threshold:
+                  failed.append(f'{metric}: {score:.2f} < {threshold}')
+
+          if failed:
+              print('Evaluation thresholds not met:')
+              for f in failed:
+                  print(f'  - {f}')
+              exit(1)
+          else:
+              print('All evaluation thresholds met!')
+          "
+
+      - name: Upload results artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results
+          path: eval_results.json

@@ -1,0 +1,135 @@
+# DocuMind Alerting Rules for Prometheus
+
+groups:
+  - name: documind-api
+    interval: 30s
+    rules:
+      # High error rate
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m])) 
+          / sum(rate(http_requests_total[5m])) * 100 > 5
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "High HTTP error rate (>5%)"
+          description: "Error rate is {{ $value | printf \"%.2f\" }}% over the last 5 minutes"
+
+      # High latency
+      - alert: HighLatencyP95
+        expr: |
+          histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High request latency (p95 > 2s)"
+          description: "P95 latency is {{ $value | printf \"%.2f\" }}s"
+
+      # Service down
+      - alert: ServiceDown
+        expr: up{job="documind-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "DocuMind API is down"
+          description: "The DocuMind API service is not responding"
+
+  - name: documind-llm
+    interval: 60s
+    rules:
+      # LLM high latency
+      - alert: LLMHighLatency
+        expr: |
+          histogram_quantile(0.95, rate(llm_request_duration_seconds_bucket[5m])) > 30
+        for: 5m
+        labels:
+          severity: warning
+          team: ml
+        annotations:
+          summary: "LLM response latency is high (p95 > 30s)"
+          description: "Model {{ $labels.model }} latency is {{ $value | printf \"%.2f\" }}s"
+
+      # LLM high error rate
+      - alert: LLMHighErrorRate
+        expr: |
+          sum by (model) (rate(llm_requests_total{status="error"}[5m]))
+          / sum by (model) (rate(llm_requests_total[5m])) * 100 > 10
+        for: 5m
+        labels:
+          severity: warning
+          team: ml
+        annotations:
+          summary: "High LLM error rate for {{ $labels.model }}"
+          description: "Error rate is {{ $value | printf \"%.2f\" }}%"
+
+      # Token usage spike
+      - alert: TokenUsageSpike
+        expr: |
+          sum(rate(llm_tokens_total[5m])) * 300 > 50000
+        for: 10m
+        labels:
+          severity: warning
+          team: ml
+        annotations:
+          summary: "High token consumption rate"
+          description: "Consuming {{ $value | printf \"%.0f\" }} tokens per 5 minutes"
+
+  - name: documind-agents
+    interval: 30s
+    rules:
+      # Agent failures
+      - alert: AgentHighFailureRate
+        expr: |
+          sum by (agent) (rate(agent_executions_total{status="error"}[5m]))
+          / sum by (agent) (rate(agent_executions_total[5m])) * 100 > 20
+        for: 5m
+        labels:
+          severity: warning
+          team: ml
+        annotations:
+          summary: "High failure rate for {{ $labels.agent }} agent"
+          description: "{{ $labels.agent }} has {{ $value | printf \"%.2f\" }}% failure rate"
+
+      # Document processing backlog
+      - alert: DocumentProcessingBacklog
+        expr: documents_pending > 100
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Document processing backlog growing"
+          description: "{{ $value }} documents pending processing"
+
+  - name: documind-infrastructure
+    interval: 60s
+    rules:
+      # Low cache hit rate
+      - alert: LowCacheHitRate
+        expr: |
+          cache_hits_total / (cache_hits_total + cache_misses_total) < 0.5
+        for: 15m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Low cache hit rate (<50%)"
+          description: "Cache hit rate is {{ $value | printf \"%.2f\" }}"
+
+      # Vector store errors
+      - alert: VectorStoreErrors
+        expr: |
+          sum(rate(vector_operations_total{status="error"}[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Vector store operations failing"
+          description: "{{ $value | printf \"%.2f\" }} errors per second"
