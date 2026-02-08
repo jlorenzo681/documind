@@ -1,13 +1,13 @@
 """Database service for CRUD operations."""
 
 import uuid
-from datetime import datetime
 from typing import Any
 
-from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from documind.db.models import Analysis, AnalysisResult, Document
+from documind.db.repositories.analysis import AnalysisRepository
+from documind.db.repositories.document import DocumentRepository
 from documind.monitoring import LoggerAdapter
 
 logger = LoggerAdapter("services.database")
@@ -23,6 +23,8 @@ class DatabaseService:
             session: Database session
         """
         self.session = session
+        self.documents = DocumentRepository(session)
+        self.analyses = AnalysisRepository(session)
 
     async def create_document(
         self,
@@ -54,7 +56,7 @@ class DatabaseService:
             mime_type=mime_type,
             metadata_=metadata or {},
         )
-        self.session.add(document)
+        self.documents.add(document)
         await self.session.commit()
         await self.session.refresh(document)
 
@@ -74,9 +76,7 @@ class DatabaseService:
         Returns:
             Document or None
         """
-        query = select(Document).where(Document.id == document_id)
-        result = await self.session.execute(query)
-        return result.scalar_one_or_none()
+        return await self.documents.get_by_id(document_id)
 
     async def create_analysis(
         self,
@@ -97,7 +97,7 @@ class DatabaseService:
             task_type=task_type,
             status="pending",
         )
-        self.session.add(analysis)
+        self.analyses.add(analysis)
         await self.session.commit()
         await self.session.refresh(analysis)
 
@@ -122,18 +122,7 @@ class DatabaseService:
             status: New status
             error_message: Optional error message
         """
-        values = {
-            "status": status,
-        }
-        if status in ("completed", "failed"):
-            values["completed_at"] = datetime.now()  # type: ignore
-
-        if error_message:
-            values["error_message"] = error_message
-
-        query = update(Analysis).where(Analysis.id == analysis_id).values(**values)
-        await self.session.execute(query)
-        await self.session.commit()
+        await self.analyses.update_status(analysis_id, status, error_message)
 
         logger.info(
             "Updated analysis status",
@@ -162,7 +151,7 @@ class DatabaseService:
             result_type=result_type,
             content=content,
         )
-        self.session.add(result)
+        self.analyses.add_result(result)
         await self.session.commit()
         await self.session.refresh(result)
 
@@ -180,9 +169,7 @@ class DatabaseService:
         Returns:
             List of documents
         """
-        query = select(Document).order_by(Document.uploaded_at.desc())
-        result = await self.session.execute(query)
-        return list(result.scalars().all())
+        return await self.documents.list_recent()
 
     async def delete_document(self, document_id: uuid.UUID) -> None:
         """Delete a document.
@@ -190,14 +177,9 @@ class DatabaseService:
         Args:
             document_id: Document ID
         """
-        query = select(Document).where(Document.id == document_id)
-        result = await self.session.execute(query)
-        document = result.scalar_one_or_none()
-
-        if document:
-            await self.session.delete(document)
+        deleted = await self.documents.delete(document_id)
+        if deleted:
             await self.session.commit()
-
             logger.info(
                 "Deleted document record",
                 document_id=str(document_id),
