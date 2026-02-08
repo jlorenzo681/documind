@@ -2,11 +2,12 @@
 
 import uuid
 from datetime import datetime
+from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 
 from documind.agents.orchestrator import run_analysis
-from documind.api.routes.documents import get_document_path
+from documind.api.dependencies import get_db_service
 from documind.models.schemas import (
     AnalysisRequest,
     AnalysisResponse,
@@ -14,6 +15,7 @@ from documind.models.schemas import (
     AnalysisTask,
 )
 from documind.monitoring import LoggerAdapter
+from documind.services.database import DatabaseService
 
 router = APIRouter()
 logger = LoggerAdapter("api.analysis")
@@ -73,6 +75,7 @@ async def _run_analysis_task(
 async def start_analysis(
     request: AnalysisRequest,
     background_tasks: BackgroundTasks,
+    db: Annotated[DatabaseService, Depends(get_db_service)],
 ) -> AnalysisResponse:
     """Start document analysis.
 
@@ -81,12 +84,21 @@ async def start_analysis(
     """
     # Validate document exists
     try:
-        document_path = get_document_path(request.document_id)
+        doc_uuid = uuid.UUID(request.document_id)
+        document = await db.get_document(doc_uuid)
     except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid document ID format",
+        ) from None
+
+    if not document:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Document {request.document_id} not found",
-        ) from None
+        )
+
+    document_path = document.file_path
 
     # Create task
     task_id = str(uuid.uuid4())
