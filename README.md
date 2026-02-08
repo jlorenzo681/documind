@@ -18,7 +18,8 @@ DocuMind is an intelligent document processing platform that uses 6 specialized 
 - **Report Generation**: Automated PDF reports with insights
 - **MLOps Pipeline**: Full CI/CD with automated LLM evaluations (ragas)
 - **Production Monitoring**: Prometheus metrics + Grafana dashboards
-- **Cloud-Native**: Dockerized, Kubernetes-ready, multi-cloud support
+- **Cloud-Native**: Dockerized, Kubernetes-ready, GCP deployment
+- **Free LLM Option**: Groq integration with Llama 3.1/3.3 (no API costs)
 
 ## 🏗️ Architecture
 
@@ -59,7 +60,10 @@ pip install -e ".[dev]"
 
 # Copy environment configuration
 cp .env.example .env
-# Edit .env with your API keys
+
+# Get a FREE Groq API key from https://console.groq.com
+# Add to .env: GROQ_API_KEY=gsk_...
+# (OpenAI/Anthropic keys are optional)
 ```
 
 ### Start Infrastructure
@@ -101,11 +105,11 @@ curl http://localhost:8000/results/TASK_ID
 
 | Category | Technologies |
 |----------|-------------|
-| **LLMs** | GPT-4o, Claude 3.5, Llama 3.1 |
+| **LLMs** | Groq (Llama 3.1/3.3 - FREE), GPT-4o, Claude 3.5 |
 | **Orchestration** | LangGraph, LangChain |
 | **API** | FastAPI, Pydantic |
 | **Vector Store** | Qdrant |
-| **Storage** | PostgreSQL, Redis, S3 |
+| **Storage** | PostgreSQL, Redis, Cloud Storage |
 | **Monitoring** | Prometheus, Grafana, LangSmith |
 | **CI/CD** | GitHub Actions, Docker |
 | **Cloud** | GCP (Cloud Run, Cloud SQL), Kubernetes |
@@ -168,19 +172,23 @@ For detailed instructions, see [Deployment Guide](docs/deployment.md).
 
 ### Kubernetes
 
-The CD pipeline automatically deploys to AWS ECS on push to `main`. See `.github/workflows/cd.yml`.
+The CD pipeline automatically deploys to GCP Cloud Run on push to `main`. See `.github/workflows/cd.yml`.
 
 ## 🔧 Configuration
 
 Key environment variables:
 
-| Variable | Description |
-|----------|-------------|
-| `OPENAI_API_KEY` | OpenAI API key |
-| `ANTHROPIC_API_KEY` | Anthropic API key |
-| `QDRANT_URL` | Qdrant vector store URL |
-| `DATABASE_URL` | PostgreSQL connection string |
-| `REDIS_URL` | Redis cache URL |
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `GROQ_API_KEY` | Groq API key (FREE) | ✅ Recommended |
+| `STORAGE_PROVIDER` | `gcs` (default) or `s3` | Optional |
+| `GCS_BUCKET_NAME` | Cloud Storage bucket name | ✅ If using GCS |
+| `GCP_PROJECT_ID` | GCP Project ID | ✅ If using GCS |
+| `OPENAI_API_KEY` | OpenAI API key | Optional |
+| `ANTHROPIC_API_KEY` | Anthropic API key | Optional |
+| `QDRANT_URL` | Qdrant vector store URL | ✅ Yes |
+| `DATABASE_URL` | PostgreSQL connection string | ✅ Yes |
+| `REDIS_URL` | Redis cache URL | ✅ Yes |
 
 See `.env.example` for all options.
 

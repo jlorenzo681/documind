@@ -18,6 +18,86 @@ This guide describes how to deploy the DocuMind stack using Podman and `podman-c
   cp .env.example .env
   ```
 
+## API Keys Setup
+
+### Groq (Recommended - FREE)
+
+Groq provides free access to Llama 3.1/3.3 models with generous quotas:
+
+1. Visit https://console.groq.com
+2. Sign up for a free account
+3. Navigate to API Keys section
+4. Create a new API key
+5. Add to your `.env` file:
+   ```bash
+   GROQ_API_KEY=gsk_your_api_key_here
+   ```
+
+**Available Models:**
+- `llama-3.1-8b-instant` - Fast, simple queries
+- `llama-3.3-70b-versatile` - Balanced, general purpose (default)
+- `llama-3.1-70b-versatile` - Complex reasoning
+- `mixtral-8x7b-32768` - Large context (32K tokens)
+
+### OpenAI (Optional)
+
+If you want to use GPT models:
+
+1. Visit https://platform.openai.com
+2. Create an API key
+3. Add to `.env`:
+   ```bash
+   OPENAI_API_KEY=sk_your_api_key_here
+   ```
+
+### Anthropic (Optional)
+
+If you want to use Claude models:
+
+1. Visit https://console.anthropic.com
+2. Create an API key
+3. Add to `.env`:
+   ```bash
+   ANTHROPIC_API_KEY=sk_your_api_key_here
+   ```
+
+## Storage Setup
+
+DocuMind supports both Google Cloud Storage (GCS) and AWS S3, with GCS as the default.
+
+### Google Cloud Storage (Default)
+
+Recommended for GCP deployments and local development.
+
+1. **Authentication**:
+   - **Local**: Run `gcloud auth application-default login`
+   - **GCP**: Uses service account automatically (ADC)
+
+2. **Configuration**:
+   ```bash
+   STORAGE_PROVIDER=gcs
+   GCS_BUCKET_NAME=your-bucket-name
+   GCP_PROJECT_ID=your-project-id
+   ```
+
+3. **Create Bucket**:
+   ```bash
+   gsutil mb gs://your-bucket-name
+   ```
+
+### AWS S3 (Optional)
+
+Use this if deploying to AWS or preferring S3.
+
+1. **Configuration**:
+   ```bash
+   STORAGE_PROVIDER=s3
+   S3_BUCKET_NAME=your-bucket-name
+   AWS_ACCESS_KEY_ID=your-access-key
+   AWS_SECRET_ACCESS_KEY=your-secret-key
+   AWS_REGION=us-east-1
+   ```
+
 ## Configuration
 
 The Podman-specific configuration is located in `infra/docker/podman-compose.yml`. This file defines the core services:
@@ -177,8 +257,8 @@ terraform apply
 ### 4. Update Secrets
 
 ```bash
-# Update API keys
-echo -n '{"openai_api_key":"YOUR_KEY","anthropic_api_key":"YOUR_KEY"}' | \
+# Update API keys (use Groq for free option)
+echo -n '{"groq_api_key":"YOUR_GROQ_KEY","openai_api_key":"YOUR_KEY","anthropic_api_key":"YOUR_KEY"}' | \
   gcloud secrets versions add documind-api-keys --data-file=-
 ```
 

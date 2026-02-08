@@ -14,16 +14,17 @@ class LLMSettings(BaseSettings):
 
     openai_api_key: SecretStr = Field(default=SecretStr(""))
     anthropic_api_key: SecretStr = Field(default=SecretStr(""))
+    groq_api_key: SecretStr = Field(default=SecretStr(""))
     cohere_api_key: SecretStr = Field(default=SecretStr(""))
     huggingface_api_key: SecretStr = Field(default=SecretStr(""))
 
-    # Default models
-    default_model: str = Field(default="gpt-4o")
+    # Default models (using Groq's free models)
+    default_model: str = Field(default="llama-3.3-70b-versatile")
     embedding_model: str = Field(default="text-embedding-3-large")
 
-    # Model routing thresholds
-    simple_model: str = Field(default="gpt-4o-mini")
-    complex_model: str = Field(default="claude-3-5-sonnet-20241022")
+    # Model routing thresholds (Groq free models)
+    simple_model: str = Field(default="llama-3.1-8b-instant")
+    complex_model: str = Field(default="llama-3.1-70b-versatile")
 
 
 class VectorStoreSettings(BaseSettings):
@@ -56,11 +57,20 @@ class RedisSettings(BaseSettings):
     cache_ttl: int = Field(default=3600)  # 1 hour
 
 
-class S3Settings(BaseSettings):
-    """S3/Object storage configuration."""
+class StorageSettings(BaseSettings):
+    """Cloud storage configuration (GCS or S3)."""
 
     model_config = SettingsConfigDict(env_prefix="", extra="ignore")
 
+    # Storage provider selection
+    storage_provider: str = Field(default="gcs")  # "gcs" or "s3"
+
+    # GCS Configuration (default)
+    gcs_bucket_name: str = Field(default="documind-documents")
+    gcp_project_id: str = Field(default="")
+    google_application_credentials: str = Field(default="")
+
+    # S3 Configuration (legacy/optional)
     aws_access_key_id: SecretStr = Field(default=SecretStr(""))
     aws_secret_access_key: SecretStr = Field(default=SecretStr(""))
     aws_region: str = Field(default="us-east-1")
@@ -104,7 +114,7 @@ class Settings(BaseSettings):
     vectorstore: VectorStoreSettings = Field(default_factory=VectorStoreSettings)
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
     redis: RedisSettings = Field(default_factory=RedisSettings)
-    s3: S3Settings = Field(default_factory=S3Settings)
+    storage: StorageSettings = Field(default_factory=StorageSettings)
     monitoring: MonitoringSettings = Field(default_factory=MonitoringSettings)
 
     @property

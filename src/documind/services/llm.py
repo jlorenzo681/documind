@@ -13,9 +13,9 @@ class ModelRouter:
     """Routes requests to optimal models based on complexity.
 
     Analyzes query complexity and routes to:
-    - Simple queries → gpt-4o-mini (fast, cheap)
-    - Standard queries → gpt-4o (balanced)
-    - Complex queries → claude-3-5-sonnet (high quality)
+    - Simple queries → llama-3.1-8b-instant (fast, free)
+    - Standard queries → llama-3.3-70b-versatile (balanced, free)
+    - Complex queries → llama-3.1-70b-versatile (high quality, free)
     """
 
     def __init__(self) -> None:
@@ -158,6 +158,16 @@ class LLMService:
             )
         return self._clients["anthropic"]
 
+    def _get_groq_client(self) -> Any:
+        """Get or create Groq client."""
+        if "groq" not in self._clients:
+            from groq import AsyncGroq
+
+            self._clients["groq"] = AsyncGroq(
+                api_key=self.settings.llm.groq_api_key.get_secret_value()
+            )
+        return self._clients["groq"]
+
     async def generate(
         self,
         prompt: str,
@@ -193,6 +203,10 @@ class LLMService:
         try:
             if "claude" in model.lower():
                 response = await self._generate_anthropic(
+                    prompt, system_prompt, model, temperature, max_tokens
+                )
+            elif "llama" in model.lower() or "mixtral" in model.lower():
+                response = await self._generate_groq(
                     prompt, system_prompt, model, temperature, max_tokens
                 )
             else:
@@ -265,6 +279,36 @@ class LLMService:
         )
 
         return message.content[0].text
+
+    async def _generate_groq(
+        self,
+        prompt: str,
+        system_prompt: str | None,
+        model: str,
+        temperature: float,
+        max_tokens: int,
+    ) -> str:
+        """Generate using Groq."""
+        client = self._get_groq_client()
+
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+
+        response = await client.chat.completions.create(
+            model=model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+
+        # Track tokens
+        usage = response.usage
+        if usage:
+            self.metrics.record_token_usage(model, usage.prompt_tokens, usage.completion_tokens)
+
+        return response.choices[0].message.content or ""
 
 
 class Reranker:
