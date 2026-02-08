@@ -31,9 +31,7 @@ resource "google_storage_bucket" "documents" {
     }
   }
 
-  encryption {
-    default_kms_key_name = null # Uses Google-managed encryption by default
-  }
+  # Uses Google-managed encryption by default (no encryption block needed)
 
   cors {
     origin          = ["*"]

@@ -16,7 +16,7 @@ terraform {
   }
 
   backend "gcs" {
-    bucket = "documind-terraform-state"
+    bucket = "documind-terraform-state-jesuslorenzo-5127d"
     prefix = "prod/terraform.tfstate"
   }
 }

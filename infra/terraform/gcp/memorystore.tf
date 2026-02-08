@@ -3,7 +3,7 @@
 resource "google_redis_instance" "main" {
   name               = "${var.app_name}-redis"
   tier               = var.environment == "prod" ? "STANDARD_HA" : "BASIC"
-  memory_size_gb     = var.environment == "prod" ? 4 : 1
+  memory_size_gb     = var.environment == "prod" ? 5 : 1
   region             = var.region
   redis_version      = "REDIS_7_0"
   display_name       = "DocuMind Redis Cache"
