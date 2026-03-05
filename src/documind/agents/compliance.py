@@ -99,7 +99,7 @@ class ComplianceAgent(BaseAgent):
             state = self._add_error(state, f"Compliance check failed: {str(e)}")
             return state
 
-    async def _check_compliance(self, text: str, state: AgentState) -> list[dict[str, Any]]:
+    async def _check_compliance(self, text: str, state: AgentState) -> list[dict[str, Any]]:  # noqa: ARG002
         """Check document for compliance issues using LLM."""
         from documind.services.llm import get_llm_service
 

@@ -166,3 +166,14 @@ def monitor_agent(agent_name: str) -> Callable[[Callable[P, R]], Callable[P, R]]
         return sync_wrapper
 
     return decorator
+
+
+def setup_prometheus(app: Any) -> None:
+    """Mount the Prometheus metrics endpoint to the FastAPI app."""
+    try:
+        from prometheus_client import make_asgi_app
+
+        metrics_app = make_asgi_app()
+        app.mount("/metrics", metrics_app)
+    except ImportError:
+        pass

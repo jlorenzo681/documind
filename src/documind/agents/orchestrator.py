@@ -4,6 +4,7 @@ from functools import lru_cache
 from typing import Literal
 
 from langgraph.graph import END, StateGraph
+from langgraph.graph.state import CompiledStateGraph
 
 from documind.agents.compliance import ComplianceAgent
 from documind.agents.parser import DocumentParserAgent
@@ -89,7 +90,7 @@ def after_qa(state: AgentState) -> Literal["compliance"]:  # noqa: ARG001
 
 
 @lru_cache
-def create_orchestrator() -> StateGraph:
+def create_orchestrator() -> CompiledStateGraph:
     """Create the LangGraph workflow for document analysis.
 
     The workflow follows this pattern:
