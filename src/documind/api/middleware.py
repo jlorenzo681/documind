@@ -1,7 +1,6 @@
 """API middleware for authentication and rate limiting."""
 
 import time
-from collections import defaultdict
 from collections.abc import Callable
 
 from fastapi import HTTPException, Request, status
@@ -84,8 +83,8 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """Middleware for rate limiting requests.
 
-    Uses sliding window algorithm with in-memory storage.
-    For production, use Redis-based rate limiting.
+    Uses sliding window algorithm with Redis sorted sets.
+    Falls open if Redis is unavailable (allows requests through).
     """
 
     def __init__(
@@ -104,54 +103,82 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.requests_per_minute = requests_per_minute
         self.requests_per_hour = requests_per_hour
-        self._requests: dict[str, list[float]] = defaultdict(list)
+        self._redis = None
+
+    async def _get_redis(self):
+        """Get or create async Redis client."""
+        if self._redis is None:
+            import redis.asyncio as aioredis
+
+            settings = get_settings()
+            self._redis = aioredis.from_url(
+                settings.redis.redis_url,
+                encoding="utf-8",
+                decode_responses=True,
+            )
+        return self._redis
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """Check rate limits and process request."""
-        # Get client identifier
         client_id = self._get_client_id(request)
-
-        # Check rate limits
         now = time.time()
-        minute_ago = now - 60
-        hour_ago = now - 3600
 
-        # Clean old requests
-        self._requests[client_id] = [t for t in self._requests[client_id] if t > hour_ago]
+        minute_count = 0
+        hour_count = 0
 
-        # Count recent requests
-        minute_count = sum(1 for t in self._requests[client_id] if t > minute_ago)
-        hour_count = len(self._requests[client_id])
+        try:
+            redis = await self._get_redis()
 
-        # Check limits
-        if minute_count >= self.requests_per_minute:
-            retry_after = 60 - (now - min(t for t in self._requests[client_id] if t > minute_ago))
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Rate limit exceeded (per minute)",
-                headers={"Retry-After": str(int(retry_after))},
-            )
+            minute_key = f"ratelimit:{client_id}:minute"
+            hour_key = f"ratelimit:{client_id}:hour"
 
-        if hour_count >= self.requests_per_hour:
-            retry_after = 3600 - (now - min(self._requests[client_id]))
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Rate limit exceeded (per hour)",
-                headers={"Retry-After": str(int(retry_after))},
-            )
+            # Clean expired entries and count
+            await redis.zremrangebyscore(minute_key, 0, now - 60)
+            minute_count = await redis.zcard(minute_key)
 
-        # Record request
-        self._requests[client_id].append(now)
+            if minute_count >= self.requests_per_minute:
+                oldest = await redis.zrange(minute_key, 0, 0, withscores=True)
+                retry_after = 60 - (now - oldest[0][1]) if oldest else 60
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="Rate limit exceeded (per minute)",
+                    headers={"Retry-After": str(int(retry_after))},
+                )
+
+            await redis.zremrangebyscore(hour_key, 0, now - 3600)
+            hour_count = await redis.zcard(hour_key)
+
+            if hour_count >= self.requests_per_hour:
+                oldest = await redis.zrange(hour_key, 0, 0, withscores=True)
+                retry_after = 3600 - (now - oldest[0][1]) if oldest else 3600
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="Rate limit exceeded (per hour)",
+                    headers={"Retry-After": str(int(retry_after))},
+                )
+
+            # Record this request
+            member = f"{now}"
+            await redis.zadd(minute_key, {member: now})
+            await redis.expire(minute_key, 61)
+            await redis.zadd(hour_key, {member: now})
+            await redis.expire(hour_key, 3601)
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            # Fail open — allow request if Redis is down
+            logger.warning("Rate limiter Redis unavailable, allowing request", error=str(e))
 
         # Add rate limit headers
         response = await call_next(request)
         response.headers["X-RateLimit-Limit-Minute"] = str(self.requests_per_minute)
         response.headers["X-RateLimit-Remaining-Minute"] = str(
-            self.requests_per_minute - minute_count - 1
+            max(self.requests_per_minute - minute_count - 1, 0)
         )
         response.headers["X-RateLimit-Limit-Hour"] = str(self.requests_per_hour)
         response.headers["X-RateLimit-Remaining-Hour"] = str(
-            self.requests_per_hour - hour_count - 1
+            max(self.requests_per_hour - hour_count - 1, 0)
         )
 
         return response

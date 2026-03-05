@@ -1,13 +1,14 @@
 """Analysis endpoints."""
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 
 from documind.agents.orchestrator import run_analysis
 from documind.api.dependencies import get_db_service
+from documind.api.task_store import get_task, save_task, update_task
 from documind.models.schemas import (
     AnalysisRequest,
     AnalysisResponse,
@@ -19,9 +20,6 @@ from documind.services.database import DatabaseService
 
 router = APIRouter()
 logger = LoggerAdapter("api.analysis")
-
-# In-memory task store (replace with Redis in production)
-_tasks: dict[str, dict] = {}
 
 
 def _estimate_time(tasks: list[AnalysisTask]) -> int:
@@ -45,7 +43,7 @@ async def _run_analysis_task(
     """Background task to run document analysis."""
     logger.info("Starting background analysis", task_id=task_id)
 
-    _tasks[task_id]["status"] = AnalysisStatus.PROCESSING.value
+    await update_task(task_id, status=AnalysisStatus.PROCESSING.value)
 
     try:
         result = await run_analysis(
@@ -55,9 +53,12 @@ async def _run_analysis_task(
             questions=questions,
         )
 
-        _tasks[task_id]["status"] = AnalysisStatus.COMPLETED.value
-        _tasks[task_id]["result"] = result
-        _tasks[task_id]["completed_at"] = datetime.utcnow().isoformat()
+        await update_task(
+            task_id,
+            status=AnalysisStatus.COMPLETED.value,
+            result=result,
+            completed_at=datetime.now(UTC).isoformat(),
+        )
 
         logger.info(
             "Analysis completed",
@@ -67,8 +68,11 @@ async def _run_analysis_task(
 
     except Exception as e:
         logger.exception("Analysis failed", task_id=task_id, error=str(e))
-        _tasks[task_id]["status"] = AnalysisStatus.FAILED.value
-        _tasks[task_id]["error"] = str(e)
+        await update_task(
+            task_id,
+            status=AnalysisStatus.FAILED.value,
+            error=str(e),
+        )
 
 
 @router.post("", response_model=AnalysisResponse, status_code=status.HTTP_202_ACCEPTED)
@@ -103,16 +107,20 @@ async def start_analysis(
     # Create task
     task_id = str(uuid.uuid4())
     estimated_time = _estimate_time(request.tasks)
+    now = datetime.now(UTC)
 
-    _tasks[task_id] = {
-        "task_id": task_id,
-        "document_id": request.document_id,
-        "tasks": [t.value for t in request.tasks],
-        "status": AnalysisStatus.QUEUED.value,
-        "created_at": datetime.utcnow().isoformat(),
-        "result": None,
-        "error": None,
-    }
+    await save_task(
+        task_id,
+        {
+            "task_id": task_id,
+            "document_id": request.document_id,
+            "tasks": [t.value for t in request.tasks],
+            "status": AnalysisStatus.QUEUED.value,
+            "created_at": now.isoformat(),
+            "result": None,
+            "error": None,
+        },
+    )
 
     # Queue background task
     background_tasks.add_task(
@@ -136,27 +144,26 @@ async def start_analysis(
         status=AnalysisStatus.QUEUED,
         tasks=request.tasks,
         estimated_time_seconds=estimated_time,
-        created_at=datetime.utcnow(),
+        created_at=now,
     )
 
 
 @router.get("/{task_id}/status", response_model=AnalysisResponse)
 async def get_analysis_status(task_id: str) -> AnalysisResponse:
     """Get the status of an analysis task."""
-    if task_id not in _tasks:
+    task = await get_task(task_id)
+    if not task:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Task {task_id} not found",
         )
-
-    task = _tasks[task_id]
 
     return AnalysisResponse(
         task_id=task["task_id"],
         document_id=task["document_id"],
         status=AnalysisStatus(task["status"]),
         tasks=[AnalysisTask(t) for t in task["tasks"]],
-        estimated_time_seconds=0,  # Already computed
+        estimated_time_seconds=0,
         created_at=datetime.fromisoformat(task["created_at"]),
     )
 
@@ -164,13 +171,12 @@ async def get_analysis_status(task_id: str) -> AnalysisResponse:
 @router.post("/{task_id}/cancel", status_code=status.HTTP_200_OK)
 async def cancel_analysis(task_id: str) -> dict[str, str]:
     """Cancel a running analysis (if possible)."""
-    if task_id not in _tasks:
+    task = await get_task(task_id)
+    if not task:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Task {task_id} not found",
         )
-
-    task = _tasks[task_id]
 
     if task["status"] in {
         AnalysisStatus.COMPLETED.value,
@@ -179,14 +185,15 @@ async def cancel_analysis(task_id: str) -> dict[str, str]:
     }:
         return {"message": f"Task already {task['status']}"}
 
-    _tasks[task_id]["status"] = AnalysisStatus.CANCELLED.value
+    await update_task(task_id, status=AnalysisStatus.CANCELLED.value)
     logger.info("Analysis cancelled", task_id=task_id)
 
     return {"message": "Analysis cancelled"}
 
 
-def get_task_result(task_id: str) -> dict | None:
+async def get_task_result(task_id: str) -> dict | None:
     """Get the result of an analysis task (internal use)."""
-    if task_id not in _tasks:
+    task = await get_task(task_id)
+    if not task:
         return None
-    return _tasks[task_id].get("result")
+    return task.get("result")

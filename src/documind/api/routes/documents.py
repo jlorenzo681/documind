@@ -1,7 +1,7 @@
 """Document management endpoints."""
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -85,7 +85,7 @@ async def upload_document(
         mime_type=content_type,
         metadata={
             "original_filename": file.filename,
-            "uploaded_at": datetime.isoformat(datetime.utcnow()),
+            "uploaded_at": datetime.now(UTC).isoformat(),
         },
     )
 

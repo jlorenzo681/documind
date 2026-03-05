@@ -1,6 +1,6 @@
 """Report Generator Agent for creating PDF/DOCX reports."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -67,7 +67,7 @@ class ReportGeneratorAgent(BaseAgent):
         )
 
         # Create output path
-        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
         report_path = self.output_dir / f"report_{state['task_id']}_{timestamp}.pdf"
 
         # Setup document
@@ -99,7 +99,7 @@ class ReportGeneratorAgent(BaseAgent):
             ["Document ID:", state["document_id"]],
             ["Task ID:", state["task_id"]],
             ["Document Type:", state.get("document_type", "Unknown")],
-            ["Generated:", datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")],
+            ["Generated:", datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")],
         ]
         info_table = Table(info_data, colWidths=[2 * inch, 4 * inch])
         info_table.setStyle(

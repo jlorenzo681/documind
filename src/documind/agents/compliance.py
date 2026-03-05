@@ -101,24 +101,11 @@ class ComplianceAgent(BaseAgent):
 
     async def _check_compliance(self, text: str, state: AgentState) -> list[dict[str, Any]]:
         """Check document for compliance issues using LLM."""
-        from langchain_core.prompts import ChatPromptTemplate
-        from langchain_openai import ChatOpenAI
+        from documind.services.llm import get_llm_service
 
-        from documind.config import get_settings
+        llm_service = get_llm_service()
 
-        settings = get_settings()
-
-        llm = ChatOpenAI(
-            model=settings.llm.default_model,
-            api_key=settings.llm.openai_api_key.get_secret_value(),
-            temperature=0.1,
-        )
-
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    """You are an expert legal and compliance analyst.
+        system_prompt = """You are an expert legal and compliance analyst.
             Analyze the document for potential risks and compliance issues.
 
             Focus on:
@@ -134,20 +121,19 @@ class ComplianceAgent(BaseAgent):
             - location: Where in the document (if identifiable)
             - excerpt: Relevant text excerpt (max 100 chars)
 
-            Return as JSON array of issues. If no issues, return empty array [].""",
-                ),
-                ("user", "{document}"),
-            ]
-        )
+            Return as JSON array of issues. If no issues, return empty array []."""
 
-        chain = prompt | llm
-        result = await chain.ainvoke({"document": text[:15000]})  # Limit context
+        result = await llm_service.generate(
+            prompt=text[:15000],
+            system_prompt=system_prompt,
+            temperature=0.1,
+        )
 
         # Parse result
         import json
 
         try:
-            issues = json.loads(result.content)
+            issues = json.loads(result)
             if not isinstance(issues, list):
                 issues = []
         except json.JSONDecodeError:

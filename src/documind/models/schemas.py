@@ -1,6 +1,6 @@
 """Pydantic schemas for API requests and responses."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
@@ -34,7 +34,9 @@ class DocumentMetadata(BaseModel):
     content_type: str = Field(..., description="MIME type of the document")
     size_bytes: int = Field(..., description="File size in bytes")
     page_count: int | None = Field(None, description="Number of pages (for PDFs)")
-    uploaded_at: datetime = Field(default_factory=datetime.utcnow, description="Upload timestamp")
+    uploaded_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC), description="Upload timestamp"
+    )
     storage_path: str = Field(..., description="Path in object storage")
 
 
@@ -74,7 +76,9 @@ class AnalysisResponse(BaseModel):
     status: AnalysisStatus = Field(..., description="Current status")
     tasks: list[AnalysisTask] = Field(..., description="Requested tasks")
     estimated_time_seconds: int = Field(..., description="Estimated completion time")
-    created_at: datetime = Field(default_factory=datetime.utcnow, description="Task creation time")
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC), description="Task creation time"
+    )
 
 
 class SummaryResult(BaseModel):
@@ -119,7 +123,7 @@ class FullAnalysisResult(BaseModel):
     report_url: str | None = Field(None, description="URL to generated report")
     processing_time_seconds: float = Field(..., description="Total processing time")
     completed_at: datetime = Field(
-        default_factory=datetime.utcnow, description="Completion timestamp"
+        default_factory=lambda: datetime.now(UTC), description="Completion timestamp"
     )
 
 

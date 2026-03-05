@@ -82,41 +82,54 @@ class DocumentParserAgent(BaseAgent):
 
     async def _parse_pdf(self, path: Path) -> tuple[str, int]:
         """Parse PDF document."""
+        import asyncio
+
         import pypdf
 
-        text_parts: list[str] = []
+        def _read() -> tuple[str, int]:
+            text_parts: list[str] = []
+            with open(path, "rb") as f:
+                reader = pypdf.PdfReader(f)
+                page_count = len(reader.pages)
+                for page_num, page in enumerate(reader.pages):
+                    page_text = page.extract_text() or ""
+                    if page_text.strip():
+                        text_parts.append(f"[Page {page_num + 1}]\n{page_text}")
+            return "\n\n".join(text_parts), page_count
 
-        with open(path, "rb") as f:
-            reader = pypdf.PdfReader(f)
-            page_count = len(reader.pages)
-
-            for page_num, page in enumerate(reader.pages):
-                page_text = page.extract_text() or ""
-                if page_text.strip():
-                    text_parts.append(f"[Page {page_num + 1}]\n{page_text}")
-
-        return "\n\n".join(text_parts), page_count
+        return await asyncio.to_thread(_read)
 
     async def _parse_docx(self, path: Path) -> str:
         """Parse DOCX document."""
+        import asyncio
+
         from docx import Document
 
-        doc = Document(str(path))
-        paragraphs = [para.text for para in doc.paragraphs if para.text.strip()]
-        return "\n\n".join(paragraphs)
+        def _read() -> str:
+            doc = Document(str(path))
+            paragraphs = [para.text for para in doc.paragraphs if para.text.strip()]
+            return "\n\n".join(paragraphs)
+
+        return await asyncio.to_thread(_read)
 
     async def _parse_text(self, path: Path) -> str:
         """Parse plain text file."""
-        return path.read_text(encoding="utf-8")
+        import asyncio
+
+        return await asyncio.to_thread(path.read_text, encoding="utf-8")
 
     async def _parse_image(self, path: Path) -> str:
         """Parse image using OCR."""
+        import asyncio
+
         import pytesseract
         from PIL import Image
 
-        image = Image.open(path)
-        text = pytesseract.image_to_string(image)
-        return text
+        def _ocr() -> str:
+            image = Image.open(path)
+            return pytesseract.image_to_string(image)
+
+        return await asyncio.to_thread(_ocr)
 
     def _create_chunks(self, text: str, doc_type: str) -> list[DocumentChunk]:
         """Split text into overlapping chunks."""

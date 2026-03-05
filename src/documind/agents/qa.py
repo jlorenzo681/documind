@@ -64,12 +64,9 @@ class QAAgent(BaseAgent):
 
     async def _answer_question(self, question: str, state: AgentState) -> dict[str, Any]:
         """Answer a single question using RAG."""
-        from langchain_core.prompts import ChatPromptTemplate
-        from langchain_openai import ChatOpenAI
+        from documind.services.llm import get_llm_service
 
-        from documind.config import get_settings
-
-        settings = get_settings()
+        llm_service = get_llm_service()
 
         # Retrieve relevant chunks
         relevant_chunks = await self._retrieve_chunks(question, state)
@@ -79,42 +76,19 @@ class QAAgent(BaseAgent):
             f"[Source {i + 1}]\n{chunk['content']}" for i, chunk in enumerate(relevant_chunks)
         )
 
-        # Generate answer
-        llm = ChatOpenAI(
-            model=settings.llm.default_model,
-            api_key=settings.llm.openai_api_key.get_secret_value(),
-            temperature=0.2,
-        )
-
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    """You are a helpful document analyst. Answer the question
+        system_prompt = """You are a helpful document analyst. Answer the question
             based ONLY on the provided context. If the answer cannot be found in
             the context, say so clearly.
 
             Provide your answer in a clear, direct manner. Cite your sources using
-            [Source N] notation.""",
-                ),
-                (
-                    "user",
-                    """Context:
-{context}
+            [Source N] notation."""
 
-Question: {question}
+        user_prompt = f"Context:\n{context}\n\nQuestion: {question}\n\nAnswer:"
 
-Answer:""",
-                ),
-            ]
-        )
-
-        chain = prompt | llm
-        result = await chain.ainvoke(
-            {
-                "context": context,
-                "question": question,
-            }
+        result = await llm_service.generate(
+            prompt=user_prompt,
+            system_prompt=system_prompt,
+            temperature=0.2,
         )
 
         # Calculate confidence based on chunk relevance scores
@@ -122,7 +96,7 @@ Answer:""",
 
         return {
             "question": question,
-            "answer": str(result.content),
+            "answer": result,
             "confidence": avg_score,
             "sources": [
                 {

@@ -1,5 +1,6 @@
 """Cloud storage service with support for GCS and S3."""
 
+import asyncio
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, BinaryIO
@@ -115,7 +116,7 @@ class GCSStorageService(StorageService):
         bucket = self._get_bucket()
         blob = bucket.blob(object_name)
 
-        blob.upload_from_filename(str(file_path))
+        await asyncio.to_thread(blob.upload_from_filename, str(file_path))
 
         logger.info(
             "Uploaded file to GCS",
@@ -131,7 +132,7 @@ class GCSStorageService(StorageService):
         blob = bucket.blob(object_name)
 
         file_obj.seek(0)
-        blob.upload_from_file(file_obj)
+        await asyncio.to_thread(blob.upload_from_file, file_obj)
 
         logger.info("Uploaded file object to GCS", object_name=object_name)
 
@@ -142,7 +143,7 @@ class GCSStorageService(StorageService):
         bucket = self._get_bucket()
         blob = bucket.blob(object_name)
 
-        blob.download_to_filename(str(file_path))
+        await asyncio.to_thread(blob.download_to_filename, str(file_path))
 
         logger.info(
             "Downloaded file from GCS",
@@ -155,14 +156,14 @@ class GCSStorageService(StorageService):
         bucket = self._get_bucket()
         blob = bucket.blob(object_name)
 
-        blob.delete()
+        await asyncio.to_thread(blob.delete)
 
         logger.info("Deleted file from GCS", object_name=object_name)
 
     async def list_files(self, prefix: str = "") -> list[str]:
         """List files in GCS."""
         bucket = self._get_bucket()
-        blobs = bucket.list_blobs(prefix=prefix)
+        blobs = await asyncio.to_thread(lambda: list(bucket.list_blobs(prefix=prefix)))
 
         files = [blob.name for blob in blobs]
 
@@ -175,7 +176,8 @@ class GCSStorageService(StorageService):
         bucket = self._get_bucket()
         blob = bucket.blob(object_name)
 
-        url = blob.generate_signed_url(
+        url = await asyncio.to_thread(
+            blob.generate_signed_url,
             version="v4",
             expiration=expiration,
             method="GET",
@@ -216,7 +218,8 @@ class S3StorageService(StorageService):
         """Upload a file to S3."""
         client = self._get_client()
 
-        client.upload_file(
+        await asyncio.to_thread(
+            client.upload_file,
             str(file_path),
             self.settings.storage.s3_bucket_name,
             object_name,
@@ -235,7 +238,8 @@ class S3StorageService(StorageService):
         client = self._get_client()
 
         file_obj.seek(0)
-        client.upload_fileobj(
+        await asyncio.to_thread(
+            client.upload_fileobj,
             file_obj,
             self.settings.storage.s3_bucket_name,
             object_name,
@@ -249,7 +253,8 @@ class S3StorageService(StorageService):
         """Download a file from S3."""
         client = self._get_client()
 
-        client.download_file(
+        await asyncio.to_thread(
+            client.download_file,
             self.settings.storage.s3_bucket_name,
             object_name,
             str(file_path),
@@ -265,7 +270,8 @@ class S3StorageService(StorageService):
         """Delete a file from S3."""
         client = self._get_client()
 
-        client.delete_object(
+        await asyncio.to_thread(
+            client.delete_object,
             Bucket=self.settings.storage.s3_bucket_name,
             Key=object_name,
         )
@@ -276,7 +282,8 @@ class S3StorageService(StorageService):
         """List files in S3."""
         client = self._get_client()
 
-        response = client.list_objects_v2(
+        response = await asyncio.to_thread(
+            client.list_objects_v2,
             Bucket=self.settings.storage.s3_bucket_name,
             Prefix=prefix,
         )
@@ -291,7 +298,8 @@ class S3StorageService(StorageService):
         """Get a presigned URL for temporary access."""
         client = self._get_client()
 
-        url = client.generate_presigned_url(
+        url = await asyncio.to_thread(
+            client.generate_presigned_url,
             "get_object",
             Params={
                 "Bucket": self.settings.storage.s3_bucket_name,

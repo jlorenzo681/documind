@@ -1,11 +1,13 @@
 """Results retrieval endpoints."""
 
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import FileResponse
 
-from documind.api.routes.analysis import _tasks, get_task_result
+from documind.api.routes.analysis import get_task_result
+from documind.api.task_store import get_task
 from documind.models.schemas import (
     AnalysisStatus,
     ComplianceResult,
@@ -22,13 +24,12 @@ logger = LoggerAdapter("api.results")
 @router.get("/{task_id}", response_model=FullAnalysisResult)
 async def get_results(task_id: str) -> FullAnalysisResult:
     """Get the full results of an analysis task."""
-    if task_id not in _tasks:
+    task = await get_task(task_id)
+    if not task:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Task {task_id} not found",
         )
-
-    task = _tasks[task_id]
 
     if task["status"] == AnalysisStatus.QUEUED.value:
         raise HTTPException(
@@ -57,7 +58,7 @@ async def get_results(task_id: str) -> FullAnalysisResult:
     result = task.get("result", {})
 
     # Parse summary
-    summary_data = result.get("summary")
+    summary_data = result.get("summary") if result else None
     summary = None
     if summary_data:
         summary = SummaryResult(
@@ -69,7 +70,7 @@ async def get_results(task_id: str) -> FullAnalysisResult:
 
     # Parse QA results
     qa_results = None
-    qa_data = result.get("qa_results", [])
+    qa_data = result.get("qa_results", []) if result else []
     if qa_data:
         qa_results = [
             QAResult(
@@ -83,7 +84,7 @@ async def get_results(task_id: str) -> FullAnalysisResult:
 
     # Parse compliance
     compliance = None
-    compliance_data = result.get("compliance_report")
+    compliance_data = result.get("compliance_report") if result else None
     if compliance_data:
         compliance = ComplianceResult(
             overall_risk_score=compliance_data.get("overall_risk_score", 0.0),
@@ -93,8 +94,6 @@ async def get_results(task_id: str) -> FullAnalysisResult:
             clauses_analyzed=compliance_data.get("clauses_analyzed", 0),
         )
 
-    from datetime import datetime
-
     return FullAnalysisResult(
         task_id=task_id,
         document_id=task["document_id"],
@@ -102,10 +101,12 @@ async def get_results(task_id: str) -> FullAnalysisResult:
         summary=summary,
         qa_results=qa_results,
         compliance=compliance,
-        report_url=f"/results/{task_id}/report" if result.get("final_report_path") else None,
+        report_url=f"/results/{task_id}/report"
+        if result and result.get("final_report_path")
+        else None,
         processing_time_seconds=0.0,  # TODO: Calculate actual time
         completed_at=datetime.fromisoformat(
-            task.get("completed_at", datetime.utcnow().isoformat())
+            task.get("completed_at", datetime.now(UTC).isoformat())
         ),
     )
 
@@ -113,7 +114,7 @@ async def get_results(task_id: str) -> FullAnalysisResult:
 @router.get("/{task_id}/summary", response_model=SummaryResult)
 async def get_summary(task_id: str) -> SummaryResult:
     """Get only the summary from an analysis."""
-    result = get_task_result(task_id)
+    result = await get_task_result(task_id)
     if not result:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -138,7 +139,7 @@ async def get_summary(task_id: str) -> SummaryResult:
 @router.get("/{task_id}/report")
 async def download_report(task_id: str) -> FileResponse:
     """Download the generated PDF report."""
-    result = get_task_result(task_id)
+    result = await get_task_result(task_id)
     if not result:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

@@ -57,7 +57,7 @@ def create_initial_state(
     questions: list[str] | None = None,
 ) -> AgentState:
     """Create an initial state for a new analysis task."""
-    from datetime import datetime
+    from datetime import UTC, datetime
 
     return AgentState(
         document_id=document_id,
@@ -73,6 +73,6 @@ def create_initial_state(
         final_report_path=None,
         errors=[],
         task_id=task_id,
-        started_at=datetime.utcnow().isoformat(),
+        started_at=datetime.now(UTC).isoformat(),
         agent_trace=[],
     )

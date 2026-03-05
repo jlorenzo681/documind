@@ -54,9 +54,9 @@ class BaseAgent(ABC):
 
     def _add_trace(self, state: AgentState, message: str) -> AgentState:
         """Add a trace message to the state."""
-        from datetime import datetime
+        from datetime import UTC, datetime
 
-        trace_entry = f"[{datetime.utcnow().isoformat()}] {self.name}: {message}"
+        trace_entry = f"[{datetime.now(UTC).isoformat()}] {self.name}: {message}"
         return {**state, "agent_trace": state["agent_trace"] + [trace_entry]}
 
     def _add_error(self, state: AgentState, error: str) -> AgentState:

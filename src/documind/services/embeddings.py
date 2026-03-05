@@ -30,11 +30,11 @@ class EmbeddingService:
         self._dimension: int = 3072  # Default for text-embedding-3-large
 
     def _get_openai_client(self) -> Any:
-        """Get or create OpenAI client."""
+        """Get or create async OpenAI client."""
         if self._client is None:
-            from openai import OpenAI
+            from openai import AsyncOpenAI
 
-            self._client = OpenAI(api_key=self.settings.llm.openai_api_key.get_secret_value())
+            self._client = AsyncOpenAI(api_key=self.settings.llm.openai_api_key.get_secret_value())
         return self._client
 
     async def embed_text(self, text: str) -> list[float]:
@@ -74,20 +74,14 @@ class EmbeddingService:
 
     async def _embed_openai(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings using OpenAI."""
-        import asyncio
-
         client = self._get_openai_client()
         model = self.settings.llm.embedding_model
 
-        # Run in thread pool since OpenAI client is sync
-        def _embed() -> list[list[float]]:
-            response = client.embeddings.create(
-                model=model,
-                input=texts,
-            )
-            return [item.embedding for item in response.data]
-
-        embeddings = await asyncio.to_thread(_embed)
+        response = await client.embeddings.create(
+            model=model,
+            input=texts,
+        )
+        embeddings = [item.embedding for item in response.data]
         self._dimension = len(embeddings[0]) if embeddings else 3072
 
         logger.debug(

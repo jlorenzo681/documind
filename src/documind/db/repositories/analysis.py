@@ -38,13 +38,13 @@ class AnalysisRepository(BaseRepository[Analysis]):
             status: New status
             error_message: Optional error message
         """
-        from datetime import datetime
+        from datetime import UTC, datetime
 
         from sqlalchemy import update
 
         values = {"status": status}
         if status in ("completed", "failed"):
-            values["completed_at"] = datetime.utcnow()
+            values["completed_at"] = datetime.now(UTC)
 
         if error_message:
             values["error_message"] = error_message
