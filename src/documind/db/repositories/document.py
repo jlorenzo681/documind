@@ -1,7 +1,5 @@
 """Document repository."""
 
-from uuid import UUID
-
 from sqlalchemy import select
 
 from documind.db.models import Document
@@ -26,6 +24,7 @@ class DocumentRepository(BaseRepository[Document]):
         """
         query = select(self.model).where(self.model.filename == filename)
         result = await self.session.execute(query)
+        return result.scalar_one_or_none()
 
     async def list_recent(self) -> list[Document]:
         """List documents ordered by upload time.

@@ -30,8 +30,8 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
 
         settings = get_settings()
 
-        # Skip auth in development if no key is configured
-        if settings.debug and not settings.secret_key.get_secret_value():
+        # Skip auth entirely in development mode
+        if settings.debug:
             return await call_next(request)
 
         # Get API key from header

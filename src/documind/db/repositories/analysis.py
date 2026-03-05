@@ -39,6 +39,7 @@ class AnalysisRepository(BaseRepository[Analysis]):
             error_message: Optional error message
         """
         from datetime import datetime
+
         from sqlalchemy import update
 
         values = {"status": status}
@@ -50,17 +51,9 @@ class AnalysisRepository(BaseRepository[Analysis]):
 
         query = update(self.model).where(self.model.id == analysis_id).values(**values)
         await self.session.execute(query)
-        await self.session.execute(query)
         await self.session.commit()
 
     def add_result(self, result: AnalysisResult) -> None:
-        """Add an analysis result.
-
-        Args:
-            result: The result to add
-        """
-        self.session.add(result)
-
         """Add an analysis result.
 
         Args:
