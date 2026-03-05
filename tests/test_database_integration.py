@@ -1,10 +1,9 @@
 """Integration tests for database service."""
 
 import uuid
-from datetime import datetime
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from documind.db.base import Base
 from documind.services.database import DatabaseService
