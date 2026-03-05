@@ -163,13 +163,17 @@ class DatabaseService:
         )
         return result
 
-    async def list_documents(self) -> list[Document]:
-        """List all documents.
+    async def list_documents(self, limit: int = 50, offset: int = 0) -> list[Document]:
+        """List documents with pagination.
+
+        Args:
+            limit: Maximum number of documents to return
+            offset: Number of documents to skip
 
         Returns:
             List of documents
         """
-        return await self.documents.list_recent()
+        return await self.documents.list_recent(limit=limit, offset=offset)
 
     async def delete_document(self, document_id: uuid.UUID) -> None:
         """Delete a document.

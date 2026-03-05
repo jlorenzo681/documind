@@ -1,6 +1,7 @@
 """LLM service with model routing and optimization."""
 
 import re
+import threading
 from typing import Any
 
 from documind.config import get_settings
@@ -326,6 +327,7 @@ class Reranker:
         self.provider = provider
         self.settings = get_settings()
         self._client: Any = None
+        self._cross_encoder: Any = None
 
     async def rerank(
         self,
@@ -395,7 +397,9 @@ class Reranker:
 
         from sentence_transformers import CrossEncoder
 
-        model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
+        if self._cross_encoder is None:
+            self._cross_encoder = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
+        model = self._cross_encoder
 
         # Prepare pairs
         pairs = [(query, doc.get("content", "")) for doc in documents]
@@ -421,19 +425,24 @@ class Reranker:
 # Default instances
 _llm_service: LLMService | None = None
 _reranker: Reranker | None = None
+_llm_lock = threading.Lock()
 
 
 def get_llm_service() -> LLMService:
-    """Get the default LLM service instance."""
+    """Get the default LLM service instance (thread-safe)."""
     global _llm_service
     if _llm_service is None:
-        _llm_service = LLMService()
+        with _llm_lock:
+            if _llm_service is None:
+                _llm_service = LLMService()
     return _llm_service
 
 
 def get_reranker() -> Reranker:
-    """Get the default reranker instance."""
+    """Get the default reranker instance (thread-safe)."""
     global _reranker
     if _reranker is None:
-        _reranker = Reranker()
+        with _llm_lock:
+            if _reranker is None:
+                _reranker = Reranker()
     return _reranker

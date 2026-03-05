@@ -1,5 +1,6 @@
 """Embedding service for generating vector representations."""
 
+import threading
 from typing import Any
 
 from documind.config import get_settings
@@ -27,6 +28,8 @@ class EmbeddingService:
         self.settings = get_settings()
         self.metrics = get_metrics_collector()
         self._client: Any = None
+        self._cohere_client: Any = None
+        self._local_model: Any = None
         self._dimension: int = 3072  # Default for text-embedding-3-large
 
     def _get_openai_client(self) -> Any:
@@ -94,11 +97,14 @@ class EmbeddingService:
 
     async def _embed_cohere(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings using Cohere."""
-        import cohere
+        if self._cohere_client is None:
+            import cohere
 
-        client = cohere.AsyncClient(api_key=self.settings.llm.cohere_api_key.get_secret_value())
+            self._cohere_client = cohere.AsyncClient(
+                api_key=self.settings.llm.cohere_api_key.get_secret_value()
+            )
 
-        response = await client.embed(
+        response = await self._cohere_client.embed(
             texts=texts,
             model="embed-english-v3.0",
             input_type="search_document",
@@ -111,9 +117,12 @@ class EmbeddingService:
         """Generate embeddings using local sentence-transformers."""
         import asyncio
 
-        from sentence_transformers import SentenceTransformer
+        if self._local_model is None:
+            from sentence_transformers import SentenceTransformer
 
-        model = SentenceTransformer("all-MiniLM-L6-v2")
+            self._local_model = SentenceTransformer("all-MiniLM-L6-v2")
+
+        model = self._local_model
 
         def _embed() -> list[list[float]]:
             embeddings = model.encode(texts)
@@ -132,11 +141,14 @@ class EmbeddingService:
 
 # Default embedding service instance
 _embedding_service: EmbeddingService | None = None
+_embedding_lock = threading.Lock()
 
 
 def get_embedding_service() -> EmbeddingService:
-    """Get the default embedding service instance."""
+    """Get the default embedding service instance (thread-safe)."""
     global _embedding_service
     if _embedding_service is None:
-        _embedding_service = EmbeddingService()
+        with _embedding_lock:
+            if _embedding_service is None:
+                _embedding_service = EmbeddingService()
     return _embedding_service

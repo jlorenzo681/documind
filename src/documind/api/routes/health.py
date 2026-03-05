@@ -20,9 +20,9 @@ async def health_check() -> HealthResponse:
     try:
         from sqlalchemy import text
 
-        from documind.db.base import engine
+        from documind.db.base import get_engine
 
-        async with engine.connect() as conn:
+        async with get_engine().connect() as conn:
             await conn.execute(text("SELECT 1"))
         services["database"] = True
     except Exception as e:

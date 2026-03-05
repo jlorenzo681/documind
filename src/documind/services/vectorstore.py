@@ -1,5 +1,6 @@
 """Vector store service for document retrieval."""
 
+import threading
 from typing import Any
 from uuid import uuid4
 
@@ -320,11 +321,14 @@ class VectorStoreService:
 
 # Default vector store instance
 _vector_store: VectorStoreService | None = None
+_vs_lock = threading.Lock()
 
 
 def get_vector_store() -> VectorStoreService:
-    """Get the default vector store instance."""
+    """Get the default vector store instance (thread-safe)."""
     global _vector_store
     if _vector_store is None:
-        _vector_store = VectorStoreService()
+        with _vs_lock:
+            if _vector_store is None:
+                _vector_store = VectorStoreService()
     return _vector_store

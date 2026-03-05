@@ -1,5 +1,6 @@
 """Prometheus metrics for DocuMind."""
 
+import threading
 import time
 from collections.abc import Callable
 from functools import wraps
@@ -105,13 +106,16 @@ class MetricsCollector:
 
 # Global metrics collector instance
 _metrics_collector: MetricsCollector | None = None
+_metrics_lock = threading.Lock()
 
 
 def get_metrics_collector() -> MetricsCollector:
-    """Get the global metrics collector instance."""
+    """Get the global metrics collector instance (thread-safe)."""
     global _metrics_collector
     if _metrics_collector is None:
-        _metrics_collector = MetricsCollector()
+        with _metrics_lock:
+            if _metrics_collector is None:
+                _metrics_collector = MetricsCollector()
     return _metrics_collector
 
 

@@ -50,8 +50,10 @@ class Analysis(Base):
         ForeignKey("documents.id", ondelete="CASCADE"), nullable=False
     )
     status: Mapped[str] = mapped_column(
-        String(50), default="pending", nullable=False
-    )  # pending, processing, completed, failed
+        Enum("pending", "processing", "completed", "failed", "cancelled", name="analysis_status"),
+        default="pending",
+        nullable=False,
+    )
     task_type: Mapped[str] = mapped_column(String(50), nullable=False)  # full, summary, qa, etc.
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

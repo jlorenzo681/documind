@@ -1,5 +1,6 @@
 """Orchestrator Agent using LangGraph for workflow coordination."""
 
+from functools import lru_cache
 from typing import Literal
 
 from langgraph.graph import END, StateGraph
@@ -15,43 +16,59 @@ from documind.monitoring import LoggerAdapter
 logger = LoggerAdapter("orchestrator")
 
 
-# Agent instances
-parser_agent = DocumentParserAgent()
-summarizer_agent = SummarizationAgent()
-qa_agent = QAAgent()
-compliance_agent = ComplianceAgent()
-reporter_agent = ReportGeneratorAgent()
+# Lazy agent getters — avoids import-time instantiation
+@lru_cache
+def _get_parser() -> DocumentParserAgent:
+    return DocumentParserAgent()
+
+
+@lru_cache
+def _get_summarizer() -> SummarizationAgent:
+    return SummarizationAgent()
+
+
+@lru_cache
+def _get_qa() -> QAAgent:
+    return QAAgent()
+
+
+@lru_cache
+def _get_compliance() -> ComplianceAgent:
+    return ComplianceAgent()
+
+
+@lru_cache
+def _get_reporter() -> ReportGeneratorAgent:
+    return ReportGeneratorAgent()
 
 
 async def parse_node(state: AgentState) -> AgentState:
     """Node for document parsing."""
-    return await parser_agent.execute(state)
+    return await _get_parser().execute(state)
 
 
 async def summarize_node(state: AgentState) -> AgentState:
     """Node for document summarization."""
-    return await summarizer_agent.execute(state)
+    return await _get_summarizer().execute(state)
 
 
 async def qa_node(state: AgentState) -> AgentState:
     """Node for question answering."""
-    return await qa_agent.execute(state)
+    return await _get_qa().execute(state)
 
 
 async def compliance_node(state: AgentState) -> AgentState:
     """Node for compliance checking."""
-    return await compliance_agent.execute(state)
+    return await _get_compliance().execute(state)
 
 
 async def report_node(state: AgentState) -> AgentState:
     """Node for report generation."""
-    return await reporter_agent.execute(state)
+    return await _get_reporter().execute(state)
 
 
 def should_continue(state: AgentState) -> Literal["summarize", "end"]:
     """Determine if processing should continue after parsing."""
-    # Check for critical errors
-    # Check for critical errors
     if state.get("errors") and len(state["errors"]) > 0 and not state.get("chunks"):
         logger.error("Parsing failed, no chunks extracted")
         return "end"
@@ -61,7 +78,6 @@ def should_continue(state: AgentState) -> Literal["summarize", "end"]:
 
 def after_summary(state: AgentState) -> Literal["qa", "compliance"]:
     """Determine next step after summarization."""
-    # If there are questions, go to QA first
     if state.get("questions"):
         return "qa"
     return "compliance"
@@ -72,6 +88,7 @@ def after_qa(state: AgentState) -> Literal["compliance"]:  # noqa: ARG001
     return "compliance"
 
 
+@lru_cache
 def create_orchestrator() -> StateGraph:
     """Create the LangGraph workflow for document analysis.
 
@@ -123,10 +140,6 @@ def create_orchestrator() -> StateGraph:
     return workflow.compile()
 
 
-# Create compiled workflow
-orchestrator = create_orchestrator()
-
-
 async def run_analysis(
     document_id: str,
     document_path: str,
@@ -159,7 +172,8 @@ async def run_analysis(
         task_id=task_id,
     )
 
-    # Run the workflow
+    # Lazy — compiled graph cached by lru_cache
+    orchestrator = create_orchestrator()
     final_state = await orchestrator.ainvoke(initial_state)
 
     logger.info(

@@ -26,12 +26,18 @@ class DocumentRepository(BaseRepository[Document]):
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
-    async def list_recent(self) -> list[Document]:
-        """List documents ordered by upload time.
+    async def list_recent(self, limit: int = 50, offset: int = 0) -> list[Document]:
+        """List documents ordered by upload time with pagination.
+
+        Args:
+            limit: Maximum number of documents to return (default 50)
+            offset: Number of documents to skip (default 0)
 
         Returns:
             List of documents
         """
-        query = select(self.model).order_by(self.model.uploaded_at.desc())
+        query = (
+            select(self.model).order_by(self.model.uploaded_at.desc()).limit(limit).offset(offset)
+        )
         result = await self.session.execute(query)
         return list(result.scalars().all())

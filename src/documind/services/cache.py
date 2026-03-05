@@ -1,6 +1,7 @@
 """Caching service using Redis."""
 
 import json
+import threading
 from typing import Any
 
 from documind.config import get_settings
@@ -210,11 +211,14 @@ class CacheService:
 
 # Default cache instance
 _cache_service: CacheService | None = None
+_cache_lock = threading.Lock()
 
 
 async def get_cache_service() -> CacheService:
-    """Get the default cache service instance."""
+    """Get the default cache service instance (thread-safe)."""
     global _cache_service
     if _cache_service is None:
-        _cache_service = CacheService()
+        with _cache_lock:
+            if _cache_service is None:
+                _cache_service = CacheService()
     return _cache_service

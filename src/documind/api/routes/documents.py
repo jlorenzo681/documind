@@ -179,9 +179,11 @@ async def delete_document(
 @router.get("", response_model=list[DocumentMetadata])
 async def list_documents(
     db: Annotated[DatabaseService, Depends(get_db_service)],
+    limit: int = 50,
+    offset: int = 0,
 ) -> list[DocumentMetadata]:
-    """List all uploaded documents."""
-    documents = await db.list_documents()
+    """List uploaded documents with pagination."""
+    documents = await db.list_documents(limit=limit, offset=offset)
 
     return [
         DocumentMetadata(
