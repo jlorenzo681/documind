@@ -6,6 +6,7 @@ from typing import Any
 from documind.agents.base import BaseAgent
 from documind.models.state import AgentState, DocumentChunk
 from documind.monitoring import monitor_agent
+from documind.utils.chunking import get_chunker
 
 
 class DocumentParserAgent(BaseAgent):
@@ -20,8 +21,8 @@ class DocumentParserAgent(BaseAgent):
 
     def __init__(self) -> None:
         super().__init__("parser")
-        self.chunk_size = 1000
-        self.chunk_overlap = 200
+        # Use structure-aware chunking — respects section headers common in legal/financial docs
+        self._chunker = get_chunker("structure", chunk_size=1000)
 
     @monitor_agent("parser")
     async def execute(self, state: AgentState) -> AgentState:
@@ -132,54 +133,38 @@ class DocumentParserAgent(BaseAgent):
         return await asyncio.to_thread(_ocr)
 
     def _create_chunks(self, text: str, doc_type: str) -> list[DocumentChunk]:
-        """Split text into overlapping chunks."""
-        chunks: list[DocumentChunk] = []
+        """Split text into chunks using structure-aware chunking."""
+        import re
 
-        # Simple character-based chunking
-        # TODO: Implement semantic chunking
-        start = 0
-        chunk_index = 0
+        raw_chunks = self._chunker.chunk(text)
+        result: list[DocumentChunk] = []
 
-        while start < len(text):
-            end = start + self.chunk_size
+        for index, raw in enumerate(raw_chunks):
+            content = raw["content"].strip()
+            if not content:
+                continue
 
-            # Try to break at sentence or paragraph boundary
-            if end < len(text):
-                # Look for paragraph break
-                para_break = text.rfind("\n\n", start, end)
-                if para_break > start + self.chunk_size // 2:
-                    end = para_break + 2
-                else:
-                    # Look for sentence break
-                    sentence_break = text.rfind(". ", start, end)
-                    if sentence_break > start + self.chunk_size // 2:
-                        end = sentence_break + 2
+            # Extract page number from [Page N] markers embedded by PDF parser
+            page: int | None = None
+            match = re.search(r"\[Page (\d+)\]", content)
+            if match:
+                page = int(match.group(1))
 
-            chunk_content = text[start:end].strip()
-
-            if chunk_content:
-                # Try to extract page number if present
-                page = None
-                if "[Page" in chunk_content:
-                    import re
-
-                    match = re.search(r"\[Page (\d+)\]", chunk_content)
-                    if match:
-                        page = int(match.group(1))
-
-                chunks.append(
-                    DocumentChunk(
-                        content=chunk_content,
-                        page=page,
-                        chunk_index=chunk_index,
-                        metadata={"doc_type": doc_type, "char_start": start},
-                    )
+            result.append(
+                DocumentChunk(
+                    content=content,
+                    page=page,
+                    chunk_index=index,
+                    metadata={
+                        "doc_type": doc_type,
+                        "char_start": raw.get("char_start", 0),
+                        "char_end": raw.get("char_end", len(content)),
+                        "section_header": raw.get("header"),
+                    },
                 )
-                chunk_index += 1
+            )
 
-            start = end - self.chunk_overlap
-
-        return chunks
+        return result
 
     def get_tools(self) -> list[Any]:
         """Return tools available to this agent."""

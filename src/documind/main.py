@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from documind import __version__
-from documind.api.middleware import APIKeyMiddleware, RateLimitMiddleware
+from documind.api.middleware import APIKeyMiddleware, RateLimitMiddleware, RequestLoggingMiddleware
 from documind.api.routes import analysis, documents, health, results
 from documind.config import get_settings
 from documind.monitoring import LoggerAdapter, setup_logging
@@ -78,7 +78,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # Add middleware
+    # Add middleware (applied in reverse stack order — last added = outermost)
     if not settings.debug:
         app.add_middleware(APIKeyMiddleware)
 
@@ -92,7 +92,8 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Setup Prometheus
+    # RequestLoggingMiddleware is outermost so it measures total wall-clock time
+    app.add_middleware(RequestLoggingMiddleware)
     setup_prometheus(app)
 
     # Include routers

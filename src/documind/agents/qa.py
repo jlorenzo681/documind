@@ -4,7 +4,11 @@ from typing import Any
 
 from documind.agents.base import BaseAgent
 from documind.models.state import AgentState
-from documind.monitoring import monitor_agent
+from documind.monitoring import LoggerAdapter, monitor_agent
+from documind.services.llm import get_reranker
+from documind.services.vectorstore import get_vector_store
+
+logger = LoggerAdapter("agents.qa")
 
 
 class QAAgent(BaseAgent):
@@ -109,32 +113,61 @@ class QAAgent(BaseAgent):
         }
 
     async def _retrieve_chunks(self, question: str, state: AgentState) -> list[dict[str, Any]]:
-        """Retrieve relevant chunks for a question.
+        """Retrieve relevant chunks for a question using vector search + reranking.
 
-        For now, uses simple keyword matching. In production, this would
-        use the vector store with embeddings.
+        Stage 1: MMR similarity search via Qdrant (diverse top-15 candidates).
+        Stage 2: Cross-encoder reranking to the top 5 by exact relevance.
+        Falls back to keyword overlap scoring when the vector store is unreachable.
         """
-        # Simple relevance scoring based on word overlap
-        # TODO: Replace with actual vector store retrieval
-        question_words = set(question.lower().split())
+        document_id = state["document_id"]
 
-        scored_chunks: list[tuple[float, dict[str, Any]]] = []
-
-        for chunk in state["chunks"]:
-            chunk_words = set(chunk["content"].lower().split())
-            overlap = len(question_words & chunk_words)
-            score = overlap / max(len(question_words), 1)
-
-            scored_chunks.append(
-                (
-                    score,
-                    {**chunk, "score": score},
-                )
+        try:
+            vector_store = get_vector_store()
+            candidates = await vector_store.search_mmr(
+                query=question,
+                document_id=document_id,
+                limit=15,
+                diversity=0.3,
             )
 
-        # Sort by score and return top 5
-        scored_chunks.sort(key=lambda x: x[0], reverse=True)
-        return [chunk for _, chunk in scored_chunks[:5]]
+            if not candidates:
+                raise ValueError("No results from vector store")
+
+            # Rerank candidates with cross-encoder for precision
+            reranker = get_reranker()
+            reranked = await reranker.rerank(
+                query=question,
+                documents=candidates,
+                top_n=5,
+            )
+
+            logger.debug(
+                "RAG retrieval complete",
+                document_id=document_id,
+                candidates=len(candidates),
+                returned=len(reranked),
+            )
+
+            return reranked
+
+        except Exception as e:
+            # Graceful fallback: keyword overlap scoring against in-memory chunks
+            logger.warning(
+                "Vector store unavailable, falling back to keyword retrieval",
+                error=str(e),
+                document_id=document_id,
+            )
+            question_words = set(question.lower().split())
+            scored: list[tuple[float, dict[str, Any]]] = []
+
+            for chunk in state["chunks"]:
+                chunk_words = set(chunk["content"].lower().split())
+                overlap = len(question_words & chunk_words)
+                score = overlap / max(len(question_words), 1)
+                scored.append((score, {**chunk, "score": score}))
+
+            scored.sort(key=lambda x: x[0], reverse=True)
+            return [chunk for _, chunk in scored[:5]]
 
     def get_tools(self) -> list[Any]:
         """Return tools available to this agent."""
