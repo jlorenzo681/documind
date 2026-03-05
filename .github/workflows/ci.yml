@@ -34,6 +34,31 @@ jobs:
       - name: Run MyPy type check
         run: mypy src/ --ignore-missing-imports
 
+  dead-code:
+    name: Dead Code (Advisory)
+    runs-on: ubuntu-latest
+    continue-on-error: true  # Never blocks the build — advisory only
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Vulture
+        run: pip install vulture
+
+      - name: Run Vulture dead-code scan
+        # 80% min-confidence suppresses most framework false-positives
+        # (FastAPI route handlers, middleware dispatch(), Pydantic fields)
+        # while still surfacing genuinely orphaned code.
+        run: |
+          echo "## Dead Code Report (Advisory — non-blocking)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          vulture src/ --min-confidence 80 | tee -a $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
   security:
     name: Security Scan
     runs-on: ubuntu-latest
