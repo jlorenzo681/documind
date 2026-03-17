@@ -26,6 +26,10 @@ class LLMSettings(BaseSettings):
     simple_model: str = Field(default="llama-3.1-8b-instant")
     complex_model: str = Field(default="llama-3.1-70b-versatile")
 
+    # Local Inference
+    ollama_url: str = Field(default="http://localhost:11434")
+    infinity_url: str = Field(default="http://localhost:7997")
+
 
 class VectorStoreSettings(BaseSettings):
     """Vector store configuration."""

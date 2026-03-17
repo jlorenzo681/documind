@@ -169,6 +169,17 @@ class LLMService:
             )
         return self._clients["groq"]
 
+    def _get_local_client(self) -> Any:
+        """Get or create local (Ollama) client."""
+        if "local" not in self._clients:
+            from openai import AsyncOpenAI
+
+            self._clients["local"] = AsyncOpenAI(
+                base_url=f"{self.settings.llm.ollama_url}/v1",
+                api_key="ollama",  # Ollama doesn't require a real key
+            )
+        return self._clients["local"]
+
     async def generate(
         self,
         prompt: str,
@@ -208,6 +219,10 @@ class LLMService:
                 )
             elif "llama" in model.lower() or "mixtral" in model.lower():
                 response = await self._generate_groq(
+                    prompt, system_prompt, model, temperature, max_tokens
+                )
+            elif "local" in model.lower() or model.startswith("llama3") or model.startswith("mistral"):
+                response = await self._generate_local(
                     prompt, system_prompt, model, temperature, max_tokens
                 )
             else:
@@ -311,6 +326,31 @@ class LLMService:
 
         return response.choices[0].message.content or ""
 
+    async def _generate_local(
+        self,
+        prompt: str,
+        system_prompt: str | None,
+        model: str,
+        temperature: float,
+        max_tokens: int,
+    ) -> str:
+        """Generate using local Ollama (via OpenAI client)."""
+        client = self._get_local_client()
+
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+
+        response = await client.chat.completions.create(
+            model=model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+
+        return response.choices[0].message.content or ""
+
 
 class Reranker:
     """Reranks search results for improved relevance.
@@ -350,6 +390,8 @@ class Reranker:
 
         if self.provider == "cohere":
             return await self._rerank_cohere(query, documents, top_n)
+        elif self.provider == "local":
+            return await self._rerank_local(query, documents, top_n)
         else:
             return await self._rerank_cross_encoder(query, documents, top_n)
 
@@ -418,6 +460,40 @@ class Reranker:
             doc_copy = doc.copy()
             doc_copy["rerank_score"] = float(score)
             reranked.append(doc_copy)
+
+        return reranked
+
+    async def _rerank_local(
+        self,
+        query: str,
+        documents: list[dict[str, Any]],
+        top_n: int,
+    ) -> list[dict[str, Any]]:
+        """Rerank using local Infinity service."""
+        import httpx
+
+        url = f"{self.settings.llm.infinity_url}/rerank"
+        texts = [doc.get("content", "") for doc in documents]
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                url,
+                json={
+                    "query": query,
+                    "documents": texts,
+                    "model": "mixedbread-ai/mxbai-rerank-xsmall-v1",
+                    "top_n": top_n,
+                },
+                timeout=30.0,
+            )
+            response.raise_for_status()
+            data = response.json()
+
+        reranked = []
+        for result in data["results"]:
+            doc = documents[result["index"]].copy()
+            doc["rerank_score"] = result["relevance_score"]
+            reranked.append(doc)
 
         return reranked
 

@@ -78,6 +78,17 @@ run-podman:
 	podman-compose -f infra/docker/podman-compose.yml --profile api up -d
 	@echo "Services are starting. The API will be available at http://localhost:8000/health"
 
+# Local deployment with local inference nodes
+local-deploy:
+	$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) --profile local-inference up -d
+	@echo "Local inference nodes (Ollama & Infinity) are starting."
+	@echo "To use local inference, set the following environment variables:"
+	@echo "export EMBEDDING_PROVIDER=local-api"
+	@echo "export RERANKER_PROVIDER=local"
+	@echo "export DEFAULT_MODEL=llama3:8b (or any model you have in Ollama)"
+	$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) up -d
+	@echo "Core infrastructure is up."
+
 # Clean build artifacts
 clean:
 	rm -rf build/

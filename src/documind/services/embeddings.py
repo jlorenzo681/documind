@@ -22,7 +22,7 @@ class EmbeddingService:
         """Initialize the embedding service.
 
         Args:
-            provider: Embedding provider ("openai", "cohere", "local")
+            provider: Embedding provider ("openai", "cohere", "local", "local-api")
         """
         self.provider = provider
         self.settings = get_settings()
@@ -72,6 +72,8 @@ class EmbeddingService:
             return await self._embed_cohere(texts)
         elif self.provider == "local":
             return await self._embed_local(texts)
+        elif self.provider == "local-api":
+            return await self._embed_local_api(texts)
         else:
             raise ValueError(f"Unknown provider: {self.provider}")
 
@@ -129,6 +131,29 @@ class EmbeddingService:
             return embeddings.tolist()
 
         embeddings = await asyncio.to_thread(_embed)
+        self._dimension = len(embeddings[0]) if embeddings else 384
+
+        return embeddings
+
+    async def _embed_local_api(self, texts: list[str]) -> list[list[float]]:
+        """Generate embeddings using local Infinity service."""
+        import httpx
+
+        url = f"{self.settings.llm.infinity_url}/embeddings"
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                url,
+                json={
+                    "input": texts,
+                    "model": "BAAI/bge-small-en-v1.5",
+                },
+                timeout=30.0,
+            )
+            response.raise_for_status()
+            data = response.json()
+
+        embeddings = [item["embedding"] for item in data["data"]]
         self._dimension = len(embeddings[0]) if embeddings else 384
 
         return embeddings
