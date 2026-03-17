@@ -98,7 +98,7 @@ services:
       - ollama_data:/root/.ollama
 
   tei-embeddings:
-    image: ghcr.io/huggingface/text-embeddings-inference:turing-1.6
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.6
     container_name: documind-tei-embeddings
     profiles:
       - local-inference
@@ -106,10 +106,10 @@ services:
       - "7997:80"
     volumes:
       - tei_data:/data
-    command: --model-id jinaai/jina-embeddings-v3
+    command: --model-id BAAI/bge-large-en-v1.5
 
   tei-reranker:
-    image: ghcr.io/huggingface/text-embeddings-inference:turing-1.6
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.6
     container_name: documind-tei-reranker
     profiles:
       - local-inference

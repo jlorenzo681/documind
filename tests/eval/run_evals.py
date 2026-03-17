@@ -15,15 +15,35 @@ def run_evaluations():
     """
     try:
         from datasets import Dataset
+        from langchain_openai import ChatOpenAI, OpenAIEmbeddings
         from ragas import evaluate
-        from ragas.metrics import (
+        from ragas.metrics.collections import (
             answer_relevancy,
             context_precision,
             context_recall,
             faithfulness,
         )
+        from ragas.run_config import RunConfig
+
+        from documind.config import get_settings
+
+        settings = get_settings()
+
+        # Local LLM for evaluation (Ollama)
+        eval_llm = ChatOpenAI(
+            model="llama3.1:8b",  # Using the 8b model for evaluation speed
+            api_key="ollama",
+            base_url=f"{settings.llm.ollama_url}/v1",
+        )
+
+        # Local Embeddings for evaluation (TEI)
+        eval_embeddings = OpenAIEmbeddings(
+            model="BAAI/bge-large-en-v1.5",
+            api_key="tei",
+            base_url=f"{settings.llm.tei_embeddings_url}/v1",
+        )
     except ImportError:
-        print("ragas not installed. Generating mock results.")
+        print("ragas or langchain_openai not installed. Generating mock results.")
         results = {
             "faithfulness": 0.92,
             "answer_relevancy": 0.89,
@@ -57,7 +77,8 @@ def run_evaluations():
         }
     )
 
-    # Run evaluation
+    # Run evaluation with reduced concurrency for local Ollama stability
+    run_config = RunConfig(max_workers=1)
     results = evaluate(
         dataset=dataset,
         metrics=[
@@ -66,15 +87,22 @@ def run_evaluations():
             context_precision,
             context_recall,
         ],
+        llm=eval_llm,
+        embeddings=eval_embeddings,
+        run_config=run_config,
     )
 
-    # Convert to dict
-    result_dict = {
-        "faithfulness": float(results["faithfulness"]),
-        "answer_relevancy": float(results["answer_relevancy"]),
-        "context_precision": float(results["context_precision"]),
-        "context_recall": float(results["context_recall"]),
-    }
+    # Convert to dict - handling Ragas 0.2+ Result object
+    # In some versions, results is a dict of lists, in others it's a Result object with aggregates.
+    result_dict = {}
+    for metric_name in ["faithfulness", "answer_relevancy", "context_precision", "context_recall"]:
+        val = results[metric_name]
+        if isinstance(val, list):
+            # If it's a list, calculate the mean
+            valid_vals = [v for v in val if v is not None and not isinstance(v, (str, list))]
+            result_dict[metric_name] = sum(valid_vals) / len(valid_vals) if valid_vals else 0.0
+        else:
+            result_dict[metric_name] = float(val)
 
     save_results(result_dict)
     print_results(result_dict)

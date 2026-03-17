@@ -23,7 +23,11 @@ test-integration:
 
 # Run LLM evaluation tests
 test-eval:
-	python tests/eval/run_evals.py
+	@if [ -f ./.venv/bin/python ]; then \
+		./.venv/bin/python tests/eval/run_evals.py; \
+	else \
+		python tests/eval/run_evals.py; \
+	fi
 
 # Lint code
 lint:
