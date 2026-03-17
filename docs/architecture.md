@@ -81,17 +81,21 @@ graph TB
 ## Agent Pipeline
 
 ```mermaid
-stateDiagram-v2
-    [*] --> Parse
-    Parse --> Summarize: success
-    Parse --> [*]: error
-
-    Summarize --> QA: with questions
-    Summarize --> Compliance: no questions
+graph TD
+    START((Start)) --> PARSE[Parse Document]
+    PARSE --> COND1{Should Continue?}
     
-    QA --> Compliance
-    Compliance --> Report
-    Report --> [*]
+    COND1 -- "Error / No Chunks" --> END((End))
+    COND1 -- "Success" --> SUMMARIZE[Summarize Content]
+    
+    SUMMARIZE --> COND2{Has Questions?}
+    
+    COND2 -- "Yes" --> QA[Answer Questions]
+    COND2 -- "No" --> COMPLIANCE[Check Compliance]
+    
+    QA --> COMPLIANCE
+    COMPLIANCE --> REPORT[Generate Report]
+    REPORT --> END
 ```
 
 ## Component Details
