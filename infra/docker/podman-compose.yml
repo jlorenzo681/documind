@@ -137,6 +137,8 @@ services:
       - QDRANT_URL=http://qdrant:6333
       - REDIS_URL=redis://redis:6379/0
       - DATABASE_URL=postgresql+asyncpg://documind:documind@postgres:5432/documind
+    volumes:
+      - storage_data:/app/data/storage:z
     env_file:
       - ../../.env
     depends_on:
@@ -160,3 +162,4 @@ volumes:
   grafana_data:
   ollama_data:
   tei_data:
+  storage_data:

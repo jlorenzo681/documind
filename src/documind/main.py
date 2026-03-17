@@ -84,13 +84,26 @@ def create_app() -> FastAPI:
 
     app.add_middleware(RateLimitMiddleware)
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.cors_origins if hasattr(settings, "cors_origins") else ["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    cors_origins = settings.cors_origins if hasattr(settings, "cors_origins") else ["*"]
+    if settings.debug and cors_origins == ["*"]:
+        # Use regex for localhost in debug mode to allow credentials with wildcard-like behavior.
+        # We must set allow_origins to an empty list to avoid Starlette defaulting to "*".
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=[],
+            allow_origin_regex=r"http://(localhost|127\.0\.0\.1|0\.0\.0\.0):.*",
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+    else:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=cors_origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
 
     # RequestLoggingMiddleware is outermost so it measures total wall-clock time
     app.add_middleware(RequestLoggingMiddleware)

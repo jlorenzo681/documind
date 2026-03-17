@@ -68,7 +68,10 @@ class StorageSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="", extra="ignore")
 
     # Storage provider selection
-    storage_provider: str = Field(default="gcs")  # "gcs" or "s3"
+    storage_provider: str = Field(default="gcs")  # "gcs", "s3", or "local"
+
+    # Local Storage Configuration
+    local_storage_path: str = Field(default="/app/data/storage")
 
     # GCS Configuration (default)
     gcs_bucket_name: str = Field(default="documind-documents")

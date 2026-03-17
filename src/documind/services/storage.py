@@ -317,6 +317,94 @@ class S3StorageService(StorageService):
         return url
 
 
+class LocalStorageService(StorageService):
+    """Local filesystem implementation for development/testing."""
+
+    def __init__(self) -> None:
+        """Initialize local storage service."""
+        settings = get_settings()
+        self.base_path = Path(settings.storage.local_storage_path)
+        self.base_path.mkdir(parents=True, exist_ok=True)
+
+    async def upload_file(self, file_path: str | Path, object_name: str) -> str:
+        """Upload a file to local storage."""
+        dest_path = self.base_path / object_name
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+
+        await asyncio.to_thread(Path(file_path).replace, dest_path)
+
+        logger.info(
+            "Saved file to local storage",
+            file_path=str(file_path),
+            object_name=object_name,
+        )
+
+        return str(dest_path)
+
+    async def upload_fileobj(self, file_obj: BinaryIO, object_name: str) -> str:
+        """Upload a file object to local storage."""
+        dest_path = self.base_path / object_name
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Ensure we're at the beginning of the file object
+        if hasattr(file_obj, "seek"):
+            file_obj.seek(0)
+
+        def _write():
+            with open(dest_path, "wb") as f:
+                f.write(file_obj.read())
+
+        await asyncio.to_thread(_write)
+
+        logger.info("Saved file object to local storage", object_name=object_name)
+
+        return str(dest_path)
+
+    async def download_file(self, object_name: str, file_path: str | Path) -> None:
+        """Download a file from local storage (copy to destination)."""
+        src_path = self.base_path / object_name
+        if not src_path.exists():
+            msg = f"Object {object_name} not found in local storage"
+            raise FileNotFoundError(msg)
+
+        import shutil
+
+        await asyncio.to_thread(shutil.copy2, str(src_path), str(file_path))
+
+        logger.info(
+            "Copied file from local storage",
+            object_name=object_name,
+            file_path=str(file_path),
+        )
+
+    async def delete_file(self, object_name: str) -> None:
+        """Delete a file from local storage."""
+        file_path = self.base_path / object_name
+        if file_path.exists():
+            await asyncio.to_thread(file_path.unlink)
+            logger.info("Deleted file from local storage", object_name=object_name)
+
+    async def list_files(self, prefix: str = "") -> list[str]:
+        """List files in local storage."""
+        files = []
+        # Recursive glob to match cloud behavior
+        for path in self.base_path.rglob("*"):
+            if path.is_file():
+                rel_path = str(path.relative_to(self.base_path))
+                if rel_path.startswith(prefix):
+                    files.append(rel_path)
+
+        logger.debug("Listed files from local storage", prefix=prefix, count=len(files))
+        return files
+
+    async def get_presigned_url(self, object_name: str, _expiration: int = 3600) -> str:
+        """Get a 'presigned' URL (direct file path for local)."""
+        # For local usage, we just return the path as a file:// URL
+        # Note: In a real web app, this might be a static route URL
+        file_path = self.base_path / object_name
+        return f"file://{file_path.absolute()}"
+
+
 def get_storage_service() -> StorageService:
     """Get the configured storage service.
 
@@ -331,6 +419,9 @@ def get_storage_service() -> StorageService:
     elif settings.storage.storage_provider == "s3":
         logger.info("Using S3 storage service")
         return S3StorageService()
+    elif settings.storage.storage_provider == "local":
+        logger.info("Using Local storage service")
+        return LocalStorageService()
     else:
         msg = f"Unknown storage provider: {settings.storage.storage_provider}"
         raise ValueError(msg)

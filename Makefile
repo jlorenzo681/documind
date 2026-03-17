@@ -85,12 +85,11 @@ run-podman:
 # Local deployment with local inference nodes
 local-deploy:
 	$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) --profile local-inference up -d
-	@echo "Local inference nodes (Ollama, TEI-Embeddings, TEI-Reranker) are starting."
+	@echo "Local deployment with inference nodes (Ollama, TEI, Reranker) and core infra is starting."
 	@echo "To use local inference, set the following environment variables:"
 	@echo "export EMBEDDING_PROVIDER=local-api"
 	@echo "export RERANKER_PROVIDER=local"
 	@echo "export DEFAULT_MODEL=llama3:8b (or any model you have in Ollama)"
-	$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) up -d
 	@echo "Core infrastructure is up."
 
 # Clean build artifacts
