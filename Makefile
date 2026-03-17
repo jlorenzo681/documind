@@ -81,7 +81,7 @@ run-podman:
 # Local deployment with local inference nodes
 local-deploy:
 	$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) --profile local-inference up -d
-	@echo "Local inference nodes (Ollama & Infinity) are starting."
+	@echo "Local inference nodes (Ollama, TEI-Embeddings, TEI-Reranker) are starting."
 	@echo "To use local inference, set the following environment variables:"
 	@echo "export EMBEDDING_PROVIDER=local-api"
 	@echo "export RERANKER_PROVIDER=local"

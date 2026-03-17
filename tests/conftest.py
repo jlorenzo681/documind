@@ -1,7 +1,16 @@
-"""Pytest configuration for DocuMind tests."""
-
-
 import pytest
+from unittest.mock import patch
+
+
+@pytest.fixture(autouse=True)
+def disable_rate_limiting():
+    """Disable rate limiting middleware for all tests."""
+
+    async def mock_dispatch(request, call_next):
+        return await call_next(request)
+
+    with patch("documind.api.middleware.RateLimitMiddleware.dispatch", side_effect=mock_dispatch):
+        yield
 
 
 @pytest.fixture

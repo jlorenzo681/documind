@@ -136,25 +136,26 @@ class EmbeddingService:
         return embeddings
 
     async def _embed_local_api(self, texts: list[str]) -> list[list[float]]:
-        """Generate embeddings using local Infinity service."""
+        """Generate embeddings using local TEI Embeddings service."""
         import httpx
 
-        url = f"{self.settings.llm.infinity_url}/embeddings"
+        url = f"{self.settings.llm.tei_embeddings_url}/embed"
 
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 url,
                 json={
-                    "input": texts,
-                    "model": "BAAI/bge-small-en-v1.5",
+                    "inputs": texts,
+                    "truncate": True,
                 },
                 timeout=30.0,
             )
             response.raise_for_status()
             data = response.json()
 
-        embeddings = [item["embedding"] for item in data["data"]]
-        self._dimension = len(embeddings[0]) if embeddings else 384
+        # TEI embed returns a list of vectors
+        embeddings = data
+        self._dimension = len(embeddings[0]) if embeddings else 1024
 
         return embeddings
 

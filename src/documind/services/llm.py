@@ -469,10 +469,10 @@ class Reranker:
         documents: list[dict[str, Any]],
         top_n: int,
     ) -> list[dict[str, Any]]:
-        """Rerank using local Infinity service."""
+        """Rerank using local TEI Reranker service."""
         import httpx
 
-        url = f"{self.settings.llm.infinity_url}/rerank"
+        url = f"{self.settings.llm.tei_reranker_url}/rerank"
         texts = [doc.get("content", "") for doc in documents]
 
         async with httpx.AsyncClient() as client:
@@ -480,19 +480,21 @@ class Reranker:
                 url,
                 json={
                     "query": query,
-                    "documents": texts,
-                    "model": "mixedbread-ai/mxbai-rerank-xsmall-v1",
-                    "top_n": top_n,
+                    "texts": texts,
+                    "truncate": True,
                 },
                 timeout=30.0,
             )
             response.raise_for_status()
             data = response.json()
 
+        # TEI rerank returns a list of objects with index and score
+        results = data[:top_n]
+
         reranked = []
-        for result in data["results"]:
+        for result in results:
             doc = documents[result["index"]].copy()
-            doc["rerank_score"] = result["relevance_score"]
+            doc["rerank_score"] = result["score"]
             reranked.append(doc)
 
         return reranked

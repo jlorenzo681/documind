@@ -97,14 +97,27 @@ services:
     volumes:
       - ollama_data:/root/.ollama:z
 
-  infinity:
-    image: docker.io/michaelf34/infinity:latest
-    container_name: documind-infinity
+  tei-embeddings:
+    image: ghcr.io/huggingface/text-embeddings-inference:turing-1.6
+    container_name: documind-tei-embeddings
     profiles:
       - local-inference
     ports:
-      - "7997:7997"
-    command: v2 --model-id BAAI/bge-small-en-v1.5 --model-id mixedbread-ai/mxbai-rerank-xsmall-v1
+      - "7997:80"
+    volumes:
+      - tei_data:/data:z
+    command: --model-id jinaai/jina-embeddings-v3
+
+  tei-reranker:
+    image: ghcr.io/huggingface/text-embeddings-inference:turing-1.6
+    container_name: documind-tei-reranker
+    profiles:
+      - local-inference
+    ports:
+      - "7998:80"
+    volumes:
+      - tei_data:/data:z
+    command: --model-id mixedbread-ai/mxbai-rerank-large-v1
 
   # ============================================
   # Application (optional profile)
@@ -146,3 +159,4 @@ volumes:
   prometheus_data:
   grafana_data:
   ollama_data:
+  tei_data:

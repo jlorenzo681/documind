@@ -28,7 +28,8 @@ class LLMSettings(BaseSettings):
 
     # Local Inference
     ollama_url: str = Field(default="http://localhost:11434")
-    infinity_url: str = Field(default="http://localhost:7997")
+    tei_embeddings_url: str = Field(default="http://localhost:7997")
+    tei_reranker_url: str = Field(default="http://localhost:7998")
 
 
 class VectorStoreSettings(BaseSettings):
