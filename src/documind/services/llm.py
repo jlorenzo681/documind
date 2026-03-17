@@ -213,16 +213,18 @@ class LLMService:
         start_time = time.time()
 
         try:
-            if "claude" in model.lower():
+            if "local" in model.lower() or model.startswith("llama3") or model.startswith("mistral"):
+                response = await self._generate_local(
+                    prompt, system_prompt, model, temperature, max_tokens
+                )
+            elif "claude" in model.lower():
                 response = await self._generate_anthropic(
                     prompt, system_prompt, model, temperature, max_tokens
                 )
-            elif "llama" in model.lower() or "mixtral" in model.lower():
+            elif (
+                "llama" in model.lower() or "mixtral" in model.lower()
+            ) and self.settings.llm.groq_api_key.get_secret_value() != "your_groq_api_key_here":
                 response = await self._generate_groq(
-                    prompt, system_prompt, model, temperature, max_tokens
-                )
-            elif "local" in model.lower() or model.startswith("llama3") or model.startswith("mistral"):
-                response = await self._generate_local(
                     prompt, system_prompt, model, temperature, max_tokens
                 )
             else:
@@ -358,14 +360,14 @@ class Reranker:
     Uses Cohere rerank API or cross-encoder models.
     """
 
-    def __init__(self, provider: str = "cohere") -> None:
+    def __init__(self, provider: str | None = None) -> None:
         """Initialize the reranker.
 
         Args:
-            provider: Reranking provider ("cohere" or "cross-encoder")
+            provider: Reranking provider ("cohere", "local", or "cross-encoder")
         """
-        self.provider = provider
         self.settings = get_settings()
+        self.provider = provider or self.settings.llm.reranker_provider
         self._client: Any = None
         self._cross_encoder: Any = None
 

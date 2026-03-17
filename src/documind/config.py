@@ -21,6 +21,8 @@ class LLMSettings(BaseSettings):
     # Default models (using Groq's free models)
     default_model: str = Field(default="llama-3.3-70b-versatile")
     embedding_model: str = Field(default="text-embedding-3-large")
+    embedding_provider: str = Field(default="openai")  # "openai", "cohere", "local", "local-api"
+    reranker_provider: str = Field(default="local")  # "cohere", "local", "cross-encoder"
 
     # Model routing thresholds (Groq free models)
     simple_model: str = Field(default="llama-3.1-8b-instant")

@@ -79,12 +79,12 @@ run-docker:
 
 # Run with Podman
 run-podman:
-	podman-compose -f infra/docker/podman-compose.yml --profile api up -d
+	podman-compose -f infra/docker/podman-compose.yml --profile api --profile local-inference up -d
 	@echo "Services are starting. The API will be available at http://localhost:8000/health"
 
 # Local deployment with local inference nodes
 local-deploy:
-	$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) --profile local-inference up -d
+	podman-compose -f infra/docker/podman-compose.yml --profile api --profile local-inference up -d
 	@echo "Local deployment with inference nodes (Ollama, TEI, Reranker) and core infra is starting."
 	@echo "To use local inference, set the following environment variables:"
 	@echo "export EMBEDDING_PROVIDER=local-api"

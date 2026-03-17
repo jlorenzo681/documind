@@ -154,6 +154,21 @@ services:
       timeout: 10s
       retries: 3
 
+  chatbot:
+    profiles:
+      - api
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.frontend
+    container_name: documind-chatbot
+    ports:
+      - "8501:8501"
+    environment:
+      - API_URL=http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+
 volumes:
   qdrant_data:
   redis_data:

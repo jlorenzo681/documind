@@ -18,14 +18,14 @@ class EmbeddingService:
     - Local (sentence-transformers)
     """
 
-    def __init__(self, provider: str = "openai") -> None:
+    def __init__(self, provider: str | None = None) -> None:
         """Initialize the embedding service.
 
         Args:
             provider: Embedding provider ("openai", "cohere", "local", "local-api")
         """
-        self.provider = provider
         self.settings = get_settings()
+        self.provider = provider or self.settings.llm.embedding_provider
         self.metrics = get_metrics_collector()
         self._client: Any = None
         self._cohere_client: Any = None
