@@ -1,5 +1,6 @@
 """QA Agent for question answering over documents using RAG."""
 
+import asyncio
 from typing import Any
 
 from documind.agents.base import BaseAgent
@@ -44,12 +45,11 @@ class QAAgent(BaseAgent):
 
         state = self._add_trace(state, f"Answering {len(questions)} questions")
 
-        qa_results: list[dict[str, Any]] = []
-
         try:
-            for question in questions:
-                result = await self._answer_question(question, state)
-                qa_results.append(result)
+            # Answer all questions concurrently
+            qa_results = await asyncio.gather(
+                *[self._answer_question(q, state) for q in questions]
+            )
 
             self.logger.info(
                 "QA completed",

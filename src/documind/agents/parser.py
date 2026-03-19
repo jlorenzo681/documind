@@ -6,6 +6,7 @@ from typing import Any
 from documind.agents.base import BaseAgent
 from documind.models.state import AgentState, DocumentChunk
 from documind.monitoring import monitor_agent
+from documind.services.vectorstore import get_vector_store
 from documind.utils.chunking import get_chunker
 
 
@@ -68,6 +69,27 @@ class DocumentParserAgent(BaseAgent):
             )
 
             state = self._add_trace(state, f"Parsed {len(chunks)} chunks from {doc_type} document")
+
+            # Index chunks into vector store for RAG retrieval
+            if chunks:
+                try:
+                    vector_store = get_vector_store()
+                    await vector_store.add_documents(
+                        documents=[{"content": c["content"], "chunk_index": c["chunk_index"], "page": c.get("page"), "metadata": c.get("metadata", {})} for c in chunks],
+                        document_id=state["document_id"],
+                    )
+                    self.logger.info(
+                        "Chunks indexed into vector store",
+                        document_id=state["document_id"],
+                        chunk_count=len(chunks),
+                    )
+                    state = self._add_trace(state, f"Indexed {len(chunks)} chunks into vector store")
+                except Exception as idx_error:
+                    self.logger.warning(
+                        "Failed to index chunks into vector store, continuing with in-memory fallback",
+                        error=str(idx_error),
+                        document_id=state["document_id"],
+                    )
 
             return {
                 **state,

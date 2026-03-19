@@ -132,6 +132,15 @@ Query → Embedding → Search → Rerank → Context → LLM → Answer
 - Semantic (embedding-based)
 - Structure-aware (headers/sections)
 
+**Embedding Dimensions** (must match `VECTOR_STORE__EMBEDDING_DIMENSION`):
+
+| Provider | Model | Dimension |
+|----------|-------|-----------|
+| OpenAI (default) | text-embedding-3-large | 3072 |
+| Local API (TEI) | bge-large-en-v1.5 | 1024 |
+| Local | sentence-transformers all-MiniLM-L6-v2 | 384 |
+| Cohere | embed-english-v3.0 | 1024 |
+
 **Retrieval:**
 - Similarity search with score threshold
 - MMR for diversity

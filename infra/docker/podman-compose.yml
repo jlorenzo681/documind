@@ -96,6 +96,8 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama:z
+    devices:
+      - nvidia.com/gpu=all
 
   tei-embeddings:
     image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.6

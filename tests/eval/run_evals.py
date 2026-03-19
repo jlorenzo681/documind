@@ -144,7 +144,7 @@ def load_test_dataset() -> list[dict]:
 
 def save_results(results: dict) -> None:
     """Save evaluation results to file."""
-    output_path = Path("eval_results.json")
+    output_path = Path("tests/eval/eval_results.json")
     with open(output_path, "w") as f:
         json.dump(results, f, indent=2)
     print(f"Results saved to {output_path}")

@@ -89,7 +89,10 @@ local-deploy:
 	@echo "To use local inference, set the following environment variables:"
 	@echo "export EMBEDDING_PROVIDER=local-api"
 	@echo "export RERANKER_PROVIDER=local"
-	@echo "export DEFAULT_MODEL=llama3:8b (or any model you have in Ollama)"
+	@echo "export DEFAULT_MODEL=llama3.2:3b-instruct-q4_K_M"
+	@echo "export SIMPLE_MODEL=llama3.2:3b-instruct-q4_K_M"
+	@echo "export COMPLEX_MODEL=llama3.2:3b-instruct-q4_K_M"
+	@echo "export QDRANT_EMBEDDING_DIMENSION=1024"
 	@echo "Core infrastructure is up."
 
 # Clean build artifacts

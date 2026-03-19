@@ -1,0 +1,26 @@
+{
+  "enabled": true,
+  "name": "Sync Docs on Source Change",
+  "description": "When Python source files, config files, or other relevant project files are modified, ask the agent to update the README or /docs folder to reflect the changes.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "**/*.py",
+      "**/*.sql",
+      "**/alembic/versions/*.py",
+      "requirements*.txt",
+      "pyproject.toml",
+      "setup.cfg",
+      ".env.example",
+      "Makefile",
+      "alembic.ini"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A source file was just modified. Review the change and update the documentation accordingly — either in README.md or the relevant file in the /docs folder. Only update docs if the change affects something user-facing, architectural, or worth documenting (e.g. new features, config changes, API changes, dependency updates). Keep the docs concise and accurate."
+  },
+  "workspaceFolderName": "documind",
+  "shortName": "sync-docs-on-source-change"
+}

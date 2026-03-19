@@ -82,7 +82,7 @@ def create_app() -> FastAPI:
     if not settings.debug:
         app.add_middleware(APIKeyMiddleware)
 
-    app.add_middleware(RateLimitMiddleware)
+    app.add_middleware(RateLimitMiddleware, requests_per_minute=300)
 
     cors_origins = settings.cors_origins if hasattr(settings, "cors_origins") else ["*"]
     if settings.debug and cors_origins == ["*"]:

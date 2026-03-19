@@ -112,7 +112,7 @@ if prompt := st.chat_input("Ask a question about the document..."):
                         results_response = httpx.get(f"{API_URL}/results/{task_id}")
                         if results_response.status_code == 200:
                             data = results_response.json()
-                            qa_results = data.get("qa_results", [])
+                            qa_results = data.get("qa_results") or []
                             if qa_results:
                                 result = qa_results[0]  # We only asked one question
                                 answer = result["answer"]

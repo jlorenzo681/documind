@@ -213,7 +213,9 @@ class LLMService:
         start_time = time.time()
 
         try:
-            if "local" in model.lower() or model.startswith("llama3") or model.startswith("mistral"):
+            # Ollama model names contain ":" (e.g. llama3.2:3b-instruct-q4_K_M)
+            # Cloud model names never do (e.g. llama-3.1-8b-instant, gpt-4o)
+            if ":" in model or "local" in model.lower():
                 response = await self._generate_local(
                     prompt, system_prompt, model, temperature, max_tokens
                 )

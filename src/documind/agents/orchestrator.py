@@ -68,25 +68,53 @@ async def report_node(state: AgentState) -> AgentState:
     return await _get_reporter().execute(state)
 
 
-def should_continue(state: AgentState) -> Literal["summarize", "end"]:
-    """Determine if processing should continue after parsing."""
+def _wants(state: AgentState, task: str) -> bool:
+    """Check if a task was requested."""
+    enabled = state.get("enabled_tasks", [])
+    return task in enabled or "full" in enabled
+
+
+def should_continue(state: AgentState) -> Literal["summarize", "qa", "end"]:
+    """Determine next step after parsing."""
     if state.get("errors") and len(state["errors"]) > 0 and not state.get("chunks"):
         logger.error("Parsing failed, no chunks extracted")
         return "end"
 
-    return "summarize"
+    if _wants(state, "summarize"):
+        return "summarize"
 
-
-def after_summary(state: AgentState) -> Literal["qa", "compliance"]:
-    """Determine next step after summarization."""
-    if state.get("questions"):
+    # Skip summarize — go straight to qa if needed
+    if _wants(state, "qa") and state.get("questions"):
         return "qa"
-    return "compliance"
+
+    return "end"
 
 
-def after_qa(state: AgentState) -> Literal["compliance"]:  # noqa: ARG001
-    """Always proceed to compliance after QA."""
-    return "compliance"
+def after_summary(state: AgentState) -> Literal["qa", "compliance", "report", "end"]:
+    """Determine next step after summarization."""
+    if _wants(state, "qa") and state.get("questions"):
+        return "qa"
+    if _wants(state, "compliance"):
+        return "compliance"
+    if _wants(state, "report"):
+        return "report"
+    return "end"
+
+
+def after_qa(state: AgentState) -> Literal["compliance", "report", "end"]:
+    """Determine next step after QA."""
+    if _wants(state, "compliance"):
+        return "compliance"
+    if _wants(state, "report"):
+        return "report"
+    return "end"
+
+
+def after_compliance(state: AgentState) -> Literal["report", "end"]:
+    """Determine next step after compliance."""
+    if _wants(state, "report"):
+        return "report"
+    return "end"
 
 
 @lru_cache
@@ -121,6 +149,7 @@ def create_orchestrator() -> CompiledStateGraph:
         should_continue,
         {
             "summarize": "summarize",
+            "qa": "qa",
             "end": END,
         },
     )
@@ -131,11 +160,30 @@ def create_orchestrator() -> CompiledStateGraph:
         {
             "qa": "qa",
             "compliance": "compliance",
+            "report": "report",
+            "end": END,
         },
     )
 
-    workflow.add_edge("qa", "compliance")
-    workflow.add_edge("compliance", "report")
+    workflow.add_conditional_edges(
+        "qa",
+        after_qa,
+        {
+            "compliance": "compliance",
+            "report": "report",
+            "end": END,
+        },
+    )
+
+    workflow.add_conditional_edges(
+        "compliance",
+        after_compliance,
+        {
+            "report": "report",
+            "end": END,
+        },
+    )
+
     workflow.add_edge("report", END)
 
     return workflow.compile()
@@ -146,6 +194,7 @@ async def run_analysis(
     document_path: str,
     task_id: str,
     questions: list[str] | None = None,
+    enabled_tasks: list[str] | None = None,
 ) -> AgentState:
     """Run the complete document analysis workflow.
 
@@ -165,6 +214,7 @@ async def run_analysis(
         document_path=document_path,
         task_id=task_id,
         questions=questions,
+        enabled_tasks=enabled_tasks,
     )
 
     logger.info(
