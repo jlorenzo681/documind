@@ -11,6 +11,9 @@ from documind.services.vectorstore import get_vector_store
 
 logger = LoggerAdapter("agents.qa")
 
+CONFIDENCE_THRESHOLD = 0.3
+MAX_RETRIES = 1
+
 
 class QAAgent(BaseAgent):
     """Agent responsible for answering questions about documents.
@@ -19,6 +22,7 @@ class QAAgent(BaseAgent):
     - Vector similarity search
     - Reranking for improved relevance
     - Source citation
+    - Confidence-based retry with broader retrieval
     """
 
     def __init__(self) -> None:
@@ -37,45 +41,69 @@ class QAAgent(BaseAgent):
             state = self._add_trace(state, "No questions provided, skipping QA")
             return state
 
+        retry_count = state.get("qa_retry_count", 0)
+        is_retry = retry_count > 0
+
         self.logger.info(
             "Starting QA",
             document_id=state["document_id"],
             question_count=len(questions),
+            retry=is_retry,
         )
 
-        state = self._add_trace(state, f"Answering {len(questions)} questions")
+        state = self._add_trace(
+            state,
+            f"{'Retrying' if is_retry else 'Answering'} {len(questions)} questions"
+            + (" with broader retrieval" if is_retry else ""),
+        )
 
         try:
-            # Answer all questions concurrently
             qa_results = await asyncio.gather(
-                *[self._answer_question(q, state) for q in questions]
+                *[self._answer_question(q, state, broad=is_retry) for q in questions]
             )
+
+            low_confidence = [r for r in qa_results if r["confidence"] < CONFIDENCE_THRESHOLD]
 
             self.logger.info(
                 "QA completed",
                 document_id=state["document_id"],
                 results=len(qa_results),
+                low_confidence=len(low_confidence),
+                retry=is_retry,
             )
 
             state = self._add_trace(state, f"Answered {len(qa_results)} questions")
 
-            return {**state, "qa_results": qa_results}
+            if low_confidence:
+                self.logger.warning(
+                    "Low confidence answers detected",
+                    document_id=state["document_id"],
+                    count=len(low_confidence),
+                    threshold=CONFIDENCE_THRESHOLD,
+                )
+
+            return {**state, "qa_results": list(qa_results)}
 
         except Exception as e:
             self.logger.exception("QA failed", error=str(e))
             state = self._add_error(state, f"QA failed: {str(e)}")
             return state
 
-    async def _answer_question(self, question: str, state: AgentState) -> dict[str, Any]:
-        """Answer a single question using RAG."""
+    async def _answer_question(
+        self, question: str, state: AgentState, broad: bool = False
+    ) -> dict[str, Any]:
+        """Answer a single question using RAG.
+
+        Args:
+            broad: When True, retrieves more candidates with lower diversity
+                   (used on confidence-based retry).
+        """
         from documind.services.llm import get_llm_service
 
         llm_service = get_llm_service()
 
-        # Retrieve relevant chunks
-        relevant_chunks = await self._retrieve_chunks(question, state)
+        relevant_chunks = await self._retrieve_chunks(question, state, broad=broad)
 
-        # Build context from chunks
         context = "\n\n---\n\n".join(
             f"[Source {i + 1}]\n{chunk['content']}" for i, chunk in enumerate(relevant_chunks)
         )
@@ -95,13 +123,13 @@ class QAAgent(BaseAgent):
             temperature=0.2,
         )
 
-        # Calculate confidence based on chunk relevance scores
         avg_score = sum(c.get("score", 0.5) for c in relevant_chunks) / max(len(relevant_chunks), 1)
 
         return {
             "question": question,
             "answer": result,
             "confidence": avg_score,
+            "low_confidence": avg_score < CONFIDENCE_THRESHOLD,
             "sources": [
                 {
                     "chunk_index": c["chunk_index"],
@@ -112,33 +140,37 @@ class QAAgent(BaseAgent):
             ],
         }
 
-    async def _retrieve_chunks(self, question: str, state: AgentState) -> list[dict[str, Any]]:
-        """Retrieve relevant chunks for a question using vector search + reranking.
+    async def _retrieve_chunks(
+        self, question: str, state: AgentState, broad: bool = False
+    ) -> list[dict[str, Any]]:
+        """Retrieve relevant chunks using vector search + reranking.
 
-        Stage 1: MMR similarity search via Qdrant (diverse top-15 candidates).
-        Stage 2: Cross-encoder reranking to the top 5 by exact relevance.
-        Falls back to keyword overlap scoring when the vector store is unreachable.
+        Normal mode: top-15 MMR candidates → rerank to top 5.
+        Broad mode (retry): top-30 candidates, lower diversity → rerank to top 8.
+        Falls back to keyword overlap when vector store is unreachable.
         """
         document_id = state["document_id"]
+        limit = 30 if broad else 15
+        diversity = 0.1 if broad else 0.3
+        top_n = 8 if broad else 5
 
         try:
             vector_store = get_vector_store()
             candidates = await vector_store.search_mmr(
                 query=question,
                 document_id=document_id,
-                limit=15,
-                diversity=0.3,
+                limit=limit,
+                diversity=diversity,
             )
 
             if not candidates:
                 raise ValueError("No results from vector store")
 
-            # Rerank candidates with cross-encoder for precision
             reranker = get_reranker()
             reranked = await reranker.rerank(
                 query=question,
                 documents=candidates,
-                top_n=5,
+                top_n=top_n,
             )
 
             logger.debug(
@@ -146,12 +178,12 @@ class QAAgent(BaseAgent):
                 document_id=document_id,
                 candidates=len(candidates),
                 returned=len(reranked),
+                broad=broad,
             )
 
             return reranked
 
         except Exception as e:
-            # Graceful fallback: keyword overlap scoring against in-memory chunks
             logger.warning(
                 "Vector store unavailable, falling back to keyword retrieval",
                 error=str(e),
@@ -167,7 +199,7 @@ class QAAgent(BaseAgent):
                 scored.append((score, {**chunk, "score": score}))
 
             scored.sort(key=lambda x: x[0], reverse=True)
-            return [chunk for _, chunk in scored[:5]]
+            return [chunk for _, chunk in scored[:top_n]]
 
     def get_tools(self) -> list[Any]:
         """Return tools available to this agent."""

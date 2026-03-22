@@ -41,6 +41,9 @@ class AgentState(TypedDict):
     # Tasks requested (controls which agents run)
     enabled_tasks: list[str]
 
+    # QA retry tracking for low-confidence answers
+    qa_retry_count: int
+
     # Final outputs
     final_report_path: str | None
 
@@ -75,6 +78,7 @@ def create_initial_state(
         compliance_report=None,
         questions=questions or [],
         enabled_tasks=enabled_tasks or ["summarize", "qa", "compliance", "full"],
+        qa_retry_count=0,
         final_report_path=None,
         errors=[],
         task_id=task_id,

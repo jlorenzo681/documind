@@ -58,6 +58,11 @@ async def qa_node(state: AgentState) -> AgentState:
     return await _get_qa().execute(state)
 
 
+async def qa_retry_node(state: AgentState) -> AgentState:
+    """Retry QA with broader retrieval when confidence is below threshold."""
+    return await _get_qa().execute({**state, "qa_retry_count": state.get("qa_retry_count", 0) + 1})
+
+
 async def compliance_node(state: AgentState) -> AgentState:
     """Node for compliance checking."""
     return await _get_compliance().execute(state)
@@ -101,8 +106,32 @@ def after_summary(state: AgentState) -> Literal["qa", "compliance", "report", "e
     return "end"
 
 
-def after_qa(state: AgentState) -> Literal["compliance", "report", "end"]:
-    """Determine next step after QA."""
+def after_qa(state: AgentState) -> Literal["qa_retry", "compliance", "report", "end"]:
+    """Determine next step after QA — retry if confidence is low."""
+    from documind.agents.qa import CONFIDENCE_THRESHOLD, MAX_RETRIES
+
+    qa_results = state.get("qa_results", [])
+    retry_count = state.get("qa_retry_count", 0)
+
+    has_low_confidence = any(r.get("confidence", 1.0) < CONFIDENCE_THRESHOLD for r in qa_results)
+
+    if has_low_confidence and retry_count < MAX_RETRIES:
+        logger.info(
+            "Low confidence QA results, retrying with broader retrieval",
+            retry_count=retry_count,
+            threshold=CONFIDENCE_THRESHOLD,
+        )
+        return "qa_retry"
+
+    if _wants(state, "compliance"):
+        return "compliance"
+    if _wants(state, "report"):
+        return "report"
+    return "end"
+
+
+def after_qa_retry(state: AgentState) -> Literal["compliance", "report", "end"]:
+    """Determine next step after QA retry — always proceed regardless of confidence."""
     if _wants(state, "compliance"):
         return "compliance"
     if _wants(state, "report"):
@@ -137,6 +166,7 @@ def create_orchestrator() -> CompiledStateGraph:
     workflow.add_node("parse", parse_node)
     workflow.add_node("summarize", summarize_node)
     workflow.add_node("qa", qa_node)
+    workflow.add_node("qa_retry", qa_retry_node)
     workflow.add_node("compliance", compliance_node)
     workflow.add_node("report", report_node)
 
@@ -168,6 +198,17 @@ def create_orchestrator() -> CompiledStateGraph:
     workflow.add_conditional_edges(
         "qa",
         after_qa,
+        {
+            "qa_retry": "qa_retry",
+            "compliance": "compliance",
+            "report": "report",
+            "end": END,
+        },
+    )
+
+    workflow.add_conditional_edges(
+        "qa_retry",
+        after_qa_retry,
         {
             "compliance": "compliance",
             "report": "report",
