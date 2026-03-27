@@ -39,6 +39,7 @@ async def _run_analysis_task(
     document_id: str,
     document_path: str,
     questions: list[str] | None,
+    enabled_tasks: list[str] | None,
 ) -> None:
     """Background task to run document analysis."""
     logger.info("Starting background analysis", task_id=task_id)
@@ -51,6 +52,7 @@ async def _run_analysis_task(
             document_path=document_path,
             task_id=task_id,
             questions=questions,
+            enabled_tasks=enabled_tasks,
         )
 
         await update_task(
@@ -129,6 +131,7 @@ async def start_analysis(
         document_id=request.document_id,
         document_path=document_path,
         questions=request.questions,
+        enabled_tasks=[t.value for t in request.tasks],
     )
 
     logger.info(

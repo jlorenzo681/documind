@@ -38,6 +38,12 @@ class AgentState(TypedDict):
     # Questions for QA (if any)
     questions: list[str]
 
+    # Tasks requested (controls which agents run)
+    enabled_tasks: list[str]
+
+    # QA retry tracking for low-confidence answers
+    qa_retry_count: int
+
     # Final outputs
     final_report_path: str | None
 
@@ -55,6 +61,7 @@ def create_initial_state(
     document_path: str,
     task_id: str,
     questions: list[str] | None = None,
+    enabled_tasks: list[str] | None = None,
 ) -> AgentState:
     """Create an initial state for a new analysis task."""
     from datetime import UTC, datetime
@@ -70,6 +77,8 @@ def create_initial_state(
         qa_results=[],
         compliance_report=None,
         questions=questions or [],
+        enabled_tasks=enabled_tasks or ["summarize", "qa", "compliance", "full"],
+        qa_retry_count=0,
         final_report_path=None,
         errors=[],
         task_id=task_id,

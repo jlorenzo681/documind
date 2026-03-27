@@ -23,7 +23,11 @@ test-integration:
 
 # Run LLM evaluation tests
 test-eval:
-	python tests/eval/run_evals.py
+	@if [ -f ./.venv/bin/python ]; then \
+		./.venv/bin/python tests/eval/run_evals.py; \
+	else \
+		python tests/eval/run_evals.py; \
+	fi
 
 # Lint code
 lint:
@@ -75,8 +79,21 @@ run-docker:
 
 # Run with Podman
 run-podman:
-	podman-compose -f infra/docker/podman-compose.yml --profile api up -d
+	podman-compose -f infra/docker/podman-compose.yml --profile api --profile local-inference up -d
 	@echo "Services are starting. The API will be available at http://localhost:8000/health"
+
+# Local deployment with local inference nodes
+local-deploy:
+	podman-compose -f infra/docker/podman-compose.yml --profile api --profile local-inference up -d
+	@echo "Local deployment with inference nodes (Ollama, TEI, Reranker) and core infra is starting."
+	@echo "To use local inference, set the following environment variables:"
+	@echo "export EMBEDDING_PROVIDER=local-api"
+	@echo "export RERANKER_PROVIDER=local"
+	@echo "export DEFAULT_MODEL=llama3.2:3b-instruct-q4_K_M"
+	@echo "export SIMPLE_MODEL=llama3.2:3b-instruct-q4_K_M"
+	@echo "export COMPLEX_MODEL=llama3.2:3b-instruct-q4_K_M"
+	@echo "export QDRANT_EMBEDDING_DIMENSION=1024"
+	@echo "Core infrastructure is up."
 
 # Clean build artifacts
 clean:

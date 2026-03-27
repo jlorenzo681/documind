@@ -58,6 +58,11 @@ async def qa_node(state: AgentState) -> AgentState:
     return await _get_qa().execute(state)
 
 
+async def qa_retry_node(state: AgentState) -> AgentState:
+    """Retry QA with broader retrieval when confidence is below threshold."""
+    return await _get_qa().execute({**state, "qa_retry_count": state.get("qa_retry_count", 0) + 1})
+
+
 async def compliance_node(state: AgentState) -> AgentState:
     """Node for compliance checking."""
     return await _get_compliance().execute(state)
@@ -68,25 +73,77 @@ async def report_node(state: AgentState) -> AgentState:
     return await _get_reporter().execute(state)
 
 
-def should_continue(state: AgentState) -> Literal["summarize", "end"]:
-    """Determine if processing should continue after parsing."""
+def _wants(state: AgentState, task: str) -> bool:
+    """Check if a task was requested."""
+    enabled = state.get("enabled_tasks", [])
+    return task in enabled or "full" in enabled
+
+
+def should_continue(state: AgentState) -> Literal["summarize", "qa", "end"]:
+    """Determine next step after parsing."""
     if state.get("errors") and len(state["errors"]) > 0 and not state.get("chunks"):
         logger.error("Parsing failed, no chunks extracted")
         return "end"
 
-    return "summarize"
+    if _wants(state, "summarize"):
+        return "summarize"
 
-
-def after_summary(state: AgentState) -> Literal["qa", "compliance"]:
-    """Determine next step after summarization."""
-    if state.get("questions"):
+    # Skip summarize — go straight to qa if needed
+    if _wants(state, "qa") and state.get("questions"):
         return "qa"
-    return "compliance"
+
+    return "end"
 
 
-def after_qa(state: AgentState) -> Literal["compliance"]:  # noqa: ARG001
-    """Always proceed to compliance after QA."""
-    return "compliance"
+def after_summary(state: AgentState) -> Literal["qa", "compliance", "report", "end"]:
+    """Determine next step after summarization."""
+    if _wants(state, "qa") and state.get("questions"):
+        return "qa"
+    if _wants(state, "compliance"):
+        return "compliance"
+    if _wants(state, "report"):
+        return "report"
+    return "end"
+
+
+def after_qa(state: AgentState) -> Literal["qa_retry", "compliance", "report", "end"]:
+    """Determine next step after QA — retry if confidence is low."""
+    from documind.agents.qa import CONFIDENCE_THRESHOLD, MAX_RETRIES
+
+    qa_results = state.get("qa_results", [])
+    retry_count = state.get("qa_retry_count", 0)
+
+    has_low_confidence = any(r.get("confidence", 1.0) < CONFIDENCE_THRESHOLD for r in qa_results)
+
+    if has_low_confidence and retry_count < MAX_RETRIES:
+        logger.info(
+            "Low confidence QA results, retrying with broader retrieval",
+            retry_count=retry_count,
+            threshold=CONFIDENCE_THRESHOLD,
+        )
+        return "qa_retry"
+
+    if _wants(state, "compliance"):
+        return "compliance"
+    if _wants(state, "report"):
+        return "report"
+    return "end"
+
+
+def after_qa_retry(state: AgentState) -> Literal["compliance", "report", "end"]:
+    """Determine next step after QA retry — always proceed regardless of confidence."""
+    if _wants(state, "compliance"):
+        return "compliance"
+    if _wants(state, "report"):
+        return "report"
+    return "end"
+
+
+def after_compliance(state: AgentState) -> Literal["report", "end"]:
+    """Determine next step after compliance."""
+    if _wants(state, "report"):
+        return "report"
+    return "end"
 
 
 @lru_cache
@@ -109,6 +166,7 @@ def create_orchestrator() -> CompiledStateGraph:
     workflow.add_node("parse", parse_node)
     workflow.add_node("summarize", summarize_node)
     workflow.add_node("qa", qa_node)
+    workflow.add_node("qa_retry", qa_retry_node)
     workflow.add_node("compliance", compliance_node)
     workflow.add_node("report", report_node)
 
@@ -121,6 +179,7 @@ def create_orchestrator() -> CompiledStateGraph:
         should_continue,
         {
             "summarize": "summarize",
+            "qa": "qa",
             "end": END,
         },
     )
@@ -131,11 +190,41 @@ def create_orchestrator() -> CompiledStateGraph:
         {
             "qa": "qa",
             "compliance": "compliance",
+            "report": "report",
+            "end": END,
         },
     )
 
-    workflow.add_edge("qa", "compliance")
-    workflow.add_edge("compliance", "report")
+    workflow.add_conditional_edges(
+        "qa",
+        after_qa,
+        {
+            "qa_retry": "qa_retry",
+            "compliance": "compliance",
+            "report": "report",
+            "end": END,
+        },
+    )
+
+    workflow.add_conditional_edges(
+        "qa_retry",
+        after_qa_retry,
+        {
+            "compliance": "compliance",
+            "report": "report",
+            "end": END,
+        },
+    )
+
+    workflow.add_conditional_edges(
+        "compliance",
+        after_compliance,
+        {
+            "report": "report",
+            "end": END,
+        },
+    )
+
     workflow.add_edge("report", END)
 
     return workflow.compile()
@@ -146,6 +235,7 @@ async def run_analysis(
     document_path: str,
     task_id: str,
     questions: list[str] | None = None,
+    enabled_tasks: list[str] | None = None,
 ) -> AgentState:
     """Run the complete document analysis workflow.
 
@@ -165,6 +255,7 @@ async def run_analysis(
         document_path=document_path,
         task_id=task_id,
         questions=questions,
+        enabled_tasks=enabled_tasks,
     )
 
     logger.info(

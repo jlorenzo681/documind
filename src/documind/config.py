@@ -21,10 +21,21 @@ class LLMSettings(BaseSettings):
     # Default models (using Groq's free models)
     default_model: str = Field(default="llama-3.3-70b-versatile")
     embedding_model: str = Field(default="text-embedding-3-large")
+    embedding_provider: str = Field(default="openai")  # "openai", "cohere", "local", "local-api"
+    reranker_provider: str = Field(default="local")  # "cohere", "local", "cross-encoder"
 
     # Model routing thresholds (Groq free models)
     simple_model: str = Field(default="llama-3.1-8b-instant")
     complex_model: str = Field(default="llama-3.1-70b-versatile")
+
+    # Local Inference
+    # Recommended local model: llama3.2:3b-instruct-q4_K_M (fast, low VRAM)
+    # Pull with: ollama pull llama3.2:3b-instruct-q4_K_M
+    # For local deployment set DEFAULT_MODEL, SIMPLE_MODEL, COMPLEX_MODEL to ollama_model
+    ollama_url: str = Field(default="http://localhost:11434")
+    ollama_model: str = Field(default="llama3.2:3b-instruct-q4_K_M")
+    tei_embeddings_url: str = Field(default="http://localhost:7997")
+    tei_reranker_url: str = Field(default="http://localhost:7998")
 
 
 class VectorStoreSettings(BaseSettings):
@@ -35,7 +46,12 @@ class VectorStoreSettings(BaseSettings):
     url: str = Field(default="http://localhost:6333")
     api_key: SecretStr = Field(default=SecretStr(""))
     collection_name: str = Field(default="documents")
-    embedding_dimension: int = Field(default=3072)  # text-embedding-3-large
+    # Must match the embedding provider dimension:
+    #   openai text-embedding-3-large → 3072
+    #   local-api (TEI bge-large-en-v1.5) → 1024
+    #   local (sentence-transformers all-MiniLM-L6-v2) → 384
+    #   cohere embed-english-v3.0 → 1024
+    embedding_dimension: int = Field(default=3072)
 
 
 class DatabaseSettings(BaseSettings):
@@ -63,7 +79,10 @@ class StorageSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="", extra="ignore")
 
     # Storage provider selection
-    storage_provider: str = Field(default="gcs")  # "gcs" or "s3"
+    storage_provider: str = Field(default="gcs")  # "gcs", "s3", or "local"
+
+    # Local Storage Configuration
+    local_storage_path: str = Field(default="/app/data/storage")
 
     # GCS Configuration (default)
     gcs_bucket_name: str = Field(default="documind-documents")

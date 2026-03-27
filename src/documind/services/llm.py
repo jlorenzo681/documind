@@ -169,6 +169,17 @@ class LLMService:
             )
         return self._clients["groq"]
 
+    def _get_local_client(self) -> Any:
+        """Get or create local (Ollama) client."""
+        if "local" not in self._clients:
+            from openai import AsyncOpenAI
+
+            self._clients["local"] = AsyncOpenAI(
+                base_url=f"{self.settings.llm.ollama_url}/v1",
+                api_key="ollama",  # Ollama doesn't require a real key
+            )
+        return self._clients["local"]
+
     async def generate(
         self,
         prompt: str,
@@ -202,11 +213,19 @@ class LLMService:
         start_time = time.time()
 
         try:
-            if "claude" in model.lower():
+            # Ollama model names contain ":" (e.g. llama3.2:3b-instruct-q4_K_M)
+            # Cloud model names never do (e.g. llama-3.1-8b-instant, gpt-4o)
+            if ":" in model or "local" in model.lower():
+                response = await self._generate_local(
+                    prompt, system_prompt, model, temperature, max_tokens
+                )
+            elif "claude" in model.lower():
                 response = await self._generate_anthropic(
                     prompt, system_prompt, model, temperature, max_tokens
                 )
-            elif "llama" in model.lower() or "mixtral" in model.lower():
+            elif (
+                "llama" in model.lower() or "mixtral" in model.lower()
+            ) and self.settings.llm.groq_api_key.get_secret_value() != "your_groq_api_key_here":
                 response = await self._generate_groq(
                     prompt, system_prompt, model, temperature, max_tokens
                 )
@@ -311,6 +330,31 @@ class LLMService:
 
         return response.choices[0].message.content or ""
 
+    async def _generate_local(
+        self,
+        prompt: str,
+        system_prompt: str | None,
+        model: str,
+        temperature: float,
+        max_tokens: int,
+    ) -> str:
+        """Generate using local Ollama (via OpenAI client)."""
+        client = self._get_local_client()
+
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+
+        response = await client.chat.completions.create(
+            model=model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+
+        return response.choices[0].message.content or ""
+
 
 class Reranker:
     """Reranks search results for improved relevance.
@@ -318,14 +362,14 @@ class Reranker:
     Uses Cohere rerank API or cross-encoder models.
     """
 
-    def __init__(self, provider: str = "cohere") -> None:
+    def __init__(self, provider: str | None = None) -> None:
         """Initialize the reranker.
 
         Args:
-            provider: Reranking provider ("cohere" or "cross-encoder")
+            provider: Reranking provider ("cohere", "local", or "cross-encoder")
         """
-        self.provider = provider
         self.settings = get_settings()
+        self.provider = provider or self.settings.llm.reranker_provider
         self._client: Any = None
         self._cross_encoder: Any = None
 
@@ -350,6 +394,8 @@ class Reranker:
 
         if self.provider == "cohere":
             return await self._rerank_cohere(query, documents, top_n)
+        elif self.provider == "local":
+            return await self._rerank_local(query, documents, top_n)
         else:
             return await self._rerank_cross_encoder(query, documents, top_n)
 
@@ -418,6 +464,42 @@ class Reranker:
             doc_copy = doc.copy()
             doc_copy["rerank_score"] = float(score)
             reranked.append(doc_copy)
+
+        return reranked
+
+    async def _rerank_local(
+        self,
+        query: str,
+        documents: list[dict[str, Any]],
+        top_n: int,
+    ) -> list[dict[str, Any]]:
+        """Rerank using local TEI Reranker service."""
+        import httpx
+
+        url = f"{self.settings.llm.tei_reranker_url}/rerank"
+        texts = [doc.get("content", "") for doc in documents]
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                url,
+                json={
+                    "query": query,
+                    "texts": texts,
+                    "truncate": True,
+                },
+                timeout=30.0,
+            )
+            response.raise_for_status()
+            data = response.json()
+
+        # TEI rerank returns a list of objects with index and score
+        results = data[:top_n]
+
+        reranked = []
+        for result in results:
+            doc = documents[result["index"]].copy()
+            doc["rerank_score"] = result["score"]
+            reranked.append(doc)
 
         return reranked
 

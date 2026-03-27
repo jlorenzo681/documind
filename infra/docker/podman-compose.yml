@@ -84,6 +84,44 @@ services:
       - prometheus
 
   # ============================================
+  # Local Inference (optional profile)
+  # ============================================
+
+  ollama:
+    image: docker.io/ollama/ollama:latest
+    container_name: documind-ollama
+    profiles:
+      - local-inference
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama:z
+    devices:
+      - nvidia.com/gpu=all
+
+  tei-embeddings:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.6
+    container_name: documind-tei-embeddings
+    profiles:
+      - local-inference
+    ports:
+      - "7997:80"
+    volumes:
+      - tei_data:/data:z
+    command: --model-id BAAI/bge-large-en-v1.5
+
+  tei-reranker:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.6
+    container_name: documind-tei-reranker
+    profiles:
+      - local-inference
+    ports:
+      - "7998:80"
+    volumes:
+      - tei_data:/data:z
+    command: --model-id mixedbread-ai/mxbai-rerank-large-v1
+
+  # ============================================
   # Application (optional profile)
   # ============================================
 
@@ -101,6 +139,8 @@ services:
       - QDRANT_URL=http://qdrant:6333
       - REDIS_URL=redis://redis:6379/0
       - DATABASE_URL=postgresql+asyncpg://documind:documind@postgres:5432/documind
+    volumes:
+      - storage_data:/app/data/storage:z
     env_file:
       - ../../.env
     depends_on:
@@ -116,9 +156,27 @@ services:
       timeout: 10s
       retries: 3
 
+  chatbot:
+    profiles:
+      - api
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.frontend
+    container_name: documind-chatbot
+    ports:
+      - "8501:8501"
+    environment:
+      - API_URL=http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+
 volumes:
   qdrant_data:
   redis_data:
   postgres_data:
   prometheus_data:
   grafana_data:
+  ollama_data:
+  tei_data:
+  storage_data:

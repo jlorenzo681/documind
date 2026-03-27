@@ -189,6 +189,11 @@ Key environment variables:
 | `QDRANT_URL` | Qdrant vector store URL | ✅ Yes |
 | `DATABASE_URL` | PostgreSQL connection string | ✅ Yes |
 | `REDIS_URL` | Redis cache URL | ✅ Yes |
+| `DEFAULT_MODEL` | Default LLM for general tasks | Optional |
+| `SIMPLE_MODEL` | LLM for lightweight/fast tasks | Optional |
+| `COMPLEX_MODEL` | LLM for complex reasoning tasks | Optional |
+
+For fully local inference with Ollama, set `DEFAULT_MODEL`, `SIMPLE_MODEL`, and `COMPLEX_MODEL` to the value of `OLLAMA_MODEL` (e.g. `llama3.2:3b-instruct-q4_K_M`). Pull the model first with `ollama pull llama3.2:3b-instruct-q4_K_M`.
 
 See `.env.example` for all options.
 

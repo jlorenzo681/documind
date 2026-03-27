@@ -39,7 +39,7 @@ jobs:
         run: |
           python -c "
           import json
-          with open('eval_results.json') as f:
+          with open('tests/eval/eval_results.json') as f:
               results = json.load(f)
 
           thresholds = {
@@ -68,4 +68,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: eval-results
-          path: eval_results.json
+          path: tests/eval/eval_results.json

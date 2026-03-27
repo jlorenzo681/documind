@@ -18,14 +18,14 @@ class EmbeddingService:
     - Local (sentence-transformers)
     """
 
-    def __init__(self, provider: str = "openai") -> None:
+    def __init__(self, provider: str | None = None) -> None:
         """Initialize the embedding service.
 
         Args:
-            provider: Embedding provider ("openai", "cohere", "local")
+            provider: Embedding provider ("openai", "cohere", "local", "local-api")
         """
-        self.provider = provider
         self.settings = get_settings()
+        self.provider = provider or self.settings.llm.embedding_provider
         self.metrics = get_metrics_collector()
         self._client: Any = None
         self._cohere_client: Any = None
@@ -72,6 +72,8 @@ class EmbeddingService:
             return await self._embed_cohere(texts)
         elif self.provider == "local":
             return await self._embed_local(texts)
+        elif self.provider == "local-api":
+            return await self._embed_local_api(texts)
         else:
             raise ValueError(f"Unknown provider: {self.provider}")
 
@@ -130,6 +132,30 @@ class EmbeddingService:
 
         embeddings = await asyncio.to_thread(_embed)
         self._dimension = len(embeddings[0]) if embeddings else 384
+
+        return embeddings
+
+    async def _embed_local_api(self, texts: list[str]) -> list[list[float]]:
+        """Generate embeddings using local TEI Embeddings service."""
+        import httpx
+
+        url = f"{self.settings.llm.tei_embeddings_url}/embed"
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                url,
+                json={
+                    "inputs": texts,
+                    "truncate": True,
+                },
+                timeout=30.0,
+            )
+            response.raise_for_status()
+            data = response.json()
+
+        # TEI embed returns a list of vectors
+        embeddings = data
+        self._dimension = len(embeddings[0]) if embeddings else 1024
 
         return embeddings
 

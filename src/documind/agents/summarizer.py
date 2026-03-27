@@ -1,5 +1,6 @@
 """Summarization Agent for generating document summaries."""
 
+import asyncio
 from typing import Any
 
 from documind.agents.base import BaseAgent
@@ -112,18 +113,20 @@ class SummarizationAgent(BaseAgent):
 
         llm_service = get_llm_service()
 
-        # Map phase: summarize each chunk
+        # Map phase: summarize all chunks concurrently
         chunk_system = """Summarize the following section of a document.
             Extract the main points and key information."""
 
-        chunk_summaries = []
-        for chunk in state["chunks"]:
-            result = await llm_service.generate(
-                prompt=chunk["content"],
-                system_prompt=chunk_system,
-                temperature=0.3,
-            )
-            chunk_summaries.append(result)
+        chunk_summaries = await asyncio.gather(
+            *[
+                llm_service.generate(
+                    prompt=chunk["content"],
+                    system_prompt=chunk_system,
+                    temperature=0.3,
+                )
+                for chunk in state["chunks"]
+            ]
+        )
 
         # Reduce phase: combine chunk summaries
         combined = "\n\n---\n\n".join(chunk_summaries)

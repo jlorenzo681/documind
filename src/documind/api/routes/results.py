@@ -70,7 +70,7 @@ async def get_results(task_id: str) -> FullAnalysisResult:
 
     # Parse QA results
     qa_results = None
-    qa_data = result.get("qa_results", []) if result else []
+    qa_data = (result.get("qa_results") or []) if result else []
     if qa_data:
         qa_results = [
             QAResult(
